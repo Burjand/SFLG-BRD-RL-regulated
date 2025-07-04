@@ -1,0 +1,30 @@
+Dynamic Edge Weights: If travel costs W change over time (e.g., congestion), incorporate dynamic updates.
+
+-------------------------------------------------------------------------------------------------------------------------
+
+Client preferences (e.g., loyalty, partial assignments) or multiple criteria (e.g., price sensitivity) for richer dynamics
+
+-------------------------------------------------------------------------------------------------------------------------
+
+Client demand evolution combined with stochastic demand
+
+-------------------------------------------------------------------------------------------------------------------------
+
+Uncapacitated vs capacitated facilities. Why:
+Equilibrium behavior:
+Capacitated facilities may lead to more stable equilibria (players avoid mutually destructive overlap), while uncapacitated games might have "all-or-nothing" competition.
+Complexity:
+Capacitated models require tracking facility loads and redistributing overflow demand, which adds computational overhead.
+Realism:
+Most real-world facilities (e.g., warehouses, hospitals) have capacity limits. Uncapacitated models are simpler but less practical.
+
+-------------------------------------------------------------------------------------------------------------------------
+
+Are capacities homogeneous? Do all facilities have the same capacity, or does it vary by node?
+
+-------------------------------------------------------------------------------------------------------------------------
+
+Facilities could share a node
+
+-------------------------------------------------------------------------------------------------------------------------
+

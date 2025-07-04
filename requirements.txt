@@ -1,0 +1,7 @@
+copy
+numpy
+matplotlib.pyplot
+statistics
+networkx
+json5
+os

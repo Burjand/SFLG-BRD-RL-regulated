@@ -1,0 +1,18 @@
+{
+    //Simulation hyperparameters
+    n_simulations: 1,
+
+    //Environment hyperparameters
+    n_nodes: 100,
+    n_potential_facilities: 80,
+    n_brd_players: 10,
+    max_iterations: 1000,
+    seed: 66,    
+    convergence_threshold: 1e-5,
+    demand_distribution: ['normal',20,5],
+    weight_distribution: ['normal',5,1],
+
+    //Regulatory agent hyperparameters
+    plan: false,
+    planning_time: 5,
+}

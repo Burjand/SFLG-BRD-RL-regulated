@@ -6,9 +6,9 @@ class Regulatory_Agent():
         self.n_players = n_players
 
 
-    def choose_action(self):
+    def choose_action(self, St, valid_actions):
 
-        action = self.main_rng.choice(tuple(range(self.n_brd_players))) # Randomly select a player to find their best response
+        action = self.main_rng.choice(valid_actions) # Randomly select a player to find their best response
 
         return action
 

@@ -120,8 +120,8 @@ class BRD():
         # Calculate the total demand of captured clients (including the facility's own node)
         sum_demands = sum(self.nodes_demand[c] for c in captured_clients)
         
-        # Calculate the total cost (demand * distance) for all captured clients
-        sum_costs = sum(self.nodes_demand[c] * self.distances[c][target_facility] for c in captured_clients)
+        # Calculate the total cost (distances) for all captured clients
+        sum_costs = sum(self.distances[c][target_facility] for c in captured_clients)
         
         # Utility is the total demand minus total cost
         utility = sum_demands - sum_costs

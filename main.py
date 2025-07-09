@@ -2,8 +2,8 @@ import sys
 import os
 sys.path.append(os.path.join(os.path.dirname(__file__), 'src'))
 
-from src.flg_brd_setup.simulation import Simulation
-import src.flg_brd_setup.tools.general_tools as general_tool
+from src.environment.simulation import Simulation
+import src.environment.tools.general_tools as general_tool
 
 if __name__ == "__main__":    
 
@@ -24,6 +24,7 @@ if __name__ == "__main__":
     cost_distribution = tuple(CONFIGURATION['weight_distribution']) # The distribution of the graph's costs (edge weights)
 
     # Regulatory Agent hyperparameters
+    reward_function_name =  CONFIGURATION['reward_function_name']
     plan = CONFIGURATION['plan']
     planning_time = CONFIGURATION['planning_time']
 
@@ -37,13 +38,14 @@ if __name__ == "__main__":
                             demand_distribution,
                             cost_distribution,
                             plan,
-                            planning_time
+                            planning_time,
+                            reward_function_name = reward_function_name
                             )
     
     # Run simulations
     if n_simulations == 1:
-        iterations, potential_function_development, players_development_over_time = simulation.run_FLG_BRD_simulation()
-        simulation.show_simulation_results(iterations, potential_function_development, players_development_over_time, True)
+        iterations, potential_function_development, players_development_over_time, episode_reward = simulation.run_FLG_BRD_simulation()
+        simulation.show_simulation_results(iterations, potential_function_development, players_development_over_time, episode_reward, True)
 
     else:
 

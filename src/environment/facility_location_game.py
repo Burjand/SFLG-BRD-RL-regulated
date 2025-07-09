@@ -85,5 +85,3 @@ class FLG_environment:
 
         facilities = self.rng.choice(self.n_nodes, size=self.potential_facilities, replace=False).tolist()
         return [1 if i in facilities else 0 for i in range(self.n_nodes)]
-        
-        return selected_nodes

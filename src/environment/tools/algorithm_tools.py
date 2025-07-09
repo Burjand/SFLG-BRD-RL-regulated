@@ -1,6 +1,6 @@
 import networkx as nx
 
-class Tools():
+class a_tools():
 
     def calculate_distance_matrix(self, G):
 

@@ -3,14 +3,16 @@ import numpy as np
 import matplotlib.pyplot as plt
 import statistics as stats
 
-from src.flg_brd_setup.facility_location_game import FLG_environment
-from src.flg_brd_setup.tools.algorithm_tools import Tools
-from src.flg_brd_setup.best_response_dynamics import BRD
-from src.regulatory_agent.regulatory_agent import Regulatory_Agent as RA
+from src.environment.facility_location_game import FLG_environment
+from src.environment.tools.algorithm_tools import a_tools
+from src.environment.tools.general_tools import flatten
+from src.environment.best_response_dynamics import BRD as BRD_setup
+from src.regulatory_agent.regulatory_agent import Regulatory_Agent as RA_setup
+from src.environment.rewards import Reward
 
 class Simulation():
 
-    def __init__(self, n_nodes, n_potential_facilities, n_brd_players, max_iterations, seed, demand_distribution, weight_distribution, plan, planning_time):
+    def __init__(self, n_nodes, n_potential_facilities, n_brd_players, max_iterations, seed, demand_distribution, weight_distribution, plan, planning_time, reward_function_name):
 
         self.n_nodes = n_nodes
         self.n_potential_facilities = n_potential_facilities
@@ -22,6 +24,7 @@ class Simulation():
         self.weight_distribution = weight_distribution
         self.plan = plan
         self.planning_time = planning_time
+        self.reward_function_name = reward_function_name
 
         self.setup_simulation()
 
@@ -32,18 +35,20 @@ class Simulation():
         Initializes the whole simulation environment
         """
 
+        # Setup environment
         # Generate the FLG environment
         self.FLG_env = FLG_environment(self.n_nodes, self.n_potential_facilities, seed=self.seed, demand_distribution=self.demand_distribution, weight_distribution=self.weight_distribution)
         assert all(isinstance(node, int) for node in self.FLG_env.graph.nodes()) # Check that nodes were correctly generated (Just in case)
 
         # Calculate all distances between nodes using Dijkstra's algorithm for computational efficiency
-        self.distances = Tools().calculate_distance_matrix(self.FLG_env.graph)
+        self.distances = a_tools().calculate_distance_matrix(self.FLG_env.graph)
 
         # Setup the BRD players
-        self.BRD_setup = BRD(self.n_brd_players, self.distances, self.FLG_env, seed=self.seed)
+        self.BRD = BRD_setup(self.n_brd_players, self.distances, self.FLG_env, seed=self.seed)
+        self.reward_giver = Reward(self.reward_function_name)
 
         # Setup the Regulatory Agent
-        self.regulatory_agent = RA(self.main_rng, self.n_brd_players)
+        self.regulatory_agent = RA_setup(self.main_rng, self.n_brd_players)
 
     def run_FLG_BRD_simulation(self):
 
@@ -58,40 +63,56 @@ class Simulation():
 
         # Best Response Dynamics process
         players_find_best_response = [True] * self.n_brd_players
-        St = 
+        adj_matrix = flatten(self.FLG_env.adj_matrix)
+        demands = [int(demand) for demand in self.FLG_env.node_demand.values()]
+        players_positions = [self.BRD.players[player]['facility_position'] for player in range(self.BRD.n_players)]
+        St = adj_matrix + demands + players_positions
 
-        iterations = 0
+        t = 0 # Iterations
         potential_function_development = [] # Track how the potential function changes over time        
         players_development_over_time = [] # Track players' assignments over time
-        while any(players_find_best_response) and iterations < self.max_iterations:
-
-            # Simulation process through BRD
+        episode_reward = 0
+        while any(players_find_best_response) and t < self.max_iterations:
+        
             # Regulatory agent chooses action
-            valid_actions = self.n_brd_players
-            player_in_turn = self.regulatory_agent.choose_action(St, valid_actions)
+            valid_actions = tuple([i for i in range(self.n_brd_players)])
+            player_in_turn = self.regulatory_agent.choose_action(St, valid_actions) # The action is the turn of a player
+            action = player_in_turn
 
             # Environment simulation step
-            updated, St_plus_1, r, done = self.BRD_setup.find_best_response(player_in_turn)
+            updated = self.BRD.find_best_response(player_in_turn)
             if updated:
                 players_find_best_response = [True] * self.n_brd_players  # Force recheck all players
             else:
                 players_find_best_response[player_in_turn] = False
 
-            # RA learning
-            self.regulatory_agent.learn(St, action, r, St_plus_1, done, t, T)
+            players_positions = [self.BRD.players[player]['facility_position'] for player in range(self.BRD.n_players)]
+            St_plus_1 = adj_matrix + demands + players_positions           
+
+            # Reward calculation
+            potential_function_current_value = self.BRD.calculate_potential_function()
+            r = self.reward_giver.reward_function(potential_function_current_value, t)
+
+            # RA learning and planning
+            #self.regulatory_agent.learn(St, action, r, St_plus_1, done, t, T)
             if self.plan:
-                self.regulatory_agent.plan(planning_time, St, action, r, St_plus_1)
+                self.regulatory_agent.plan(self.planning_time, St, action, r, St_plus_1)
+
+            # Prepare for next iteration
+            St = St_plus_1
+            episode_reward += r
+            print(r)
 
             # Simulation development study
-            iterations += 1
-            potential_function_current_value = self.BRD_setup.calculate_potential_function()
+            t += 1
             potential_function_development.append(potential_function_current_value)
-            snapshot = {pid: copy.deepcopy(data) for pid, data in self.BRD_setup.players.items()}
+            snapshot = {pid: copy.deepcopy(data) for pid, data in self.BRD.players.items()}
             players_development_over_time.append(snapshot)
+                
 
         # When the while loop ends it means that all player were not capable of finding a best response so the Nash Equilibrium is reached
 
-        return iterations, potential_function_development, players_development_over_time
+        return t, potential_function_development, players_development_over_time, episode_reward
 
     
     def run_simulations(self, n_simulations):
@@ -101,34 +122,38 @@ class Simulation():
         """
         
         # Variables for simulation study
-        avg_iterations = 0
+        history_iterations = []
         potential_function_developments_per_iteration = []
         players_developments_per_iteration = []
+        episode_count = 0
+        history_rewards = []
 
         for i in range(n_simulations):
 
             print(f"Running simulation {i+1}/{n_simulations}...")
-            iterations, potential_function_development, players_development_over_time = self.run_FLG_BRD_simulation()
+            iterations, potential_function_development, players_development_over_time, episode_reward = self.run_FLG_BRD_simulation()
+            episode_count += 1
 
-            avg_iterations += iterations
+            history_iterations.append(iterations)
+            history_rewards.append(episode_reward)
             potential_function_developments_per_iteration.append(potential_function_development)
             players_developments_per_iteration.append(players_development_over_time)
 
-        avg_iterations /= n_simulations
+        avg_iterations = stats.mean(history_iterations)
 
         return avg_iterations, potential_function_developments_per_iteration, players_developments_per_iteration
     
 
-    def show_simulation_results(self, iterations, potential_function_development, players_development_over_time, plot_results=False):
+    def show_simulation_results(self, iterations, potential_function_development, players_development_over_time, episode_reward, plot_results=False):
 
         # Show the results of the simulation
         print(f"Simulation completed in {iterations} iterations")
-
         print("Final players' positions:")
         for player_id, player_data in players_development_over_time[-1].items():
             print(f"Player {player_id}: Facility Position: {player_data['facility_position']}, Utility: {player_data['Utility']}")
-
         print(f"Final Potential Function value: {potential_function_development[-1]}")
+        print(f"Episode reward: {episode_reward}")
+
 
         if plot_results:
 

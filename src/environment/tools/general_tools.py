@@ -26,3 +26,6 @@ def extract_json_data(file_path):
     except Exception as e:
         print(f"An unexpected error occurred while reading file {file_path}: {e}")
         return {} # Catch any other unexpected errors and return empty dict
+    
+def flatten(xss):
+    return [x for xs in xss for x in xs]

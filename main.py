@@ -3,12 +3,12 @@ import os
 sys.path.append(os.path.join(os.path.dirname(__file__), 'src'))
 
 from src.environment.simulation import Simulation
-import src.environment.tools.general_tools as general_tool
+import src.environment.tools.general_tools as general_tools
 
-if __name__ == "__main__":    
+if __name__ == "__main__":
 
     # --- CONFIGURATION ---
-    CONFIGURATION = general_tool.extract_json_data("config.json5")
+    CONFIGURATION = general_tools.extract_json_data("config.json5")
 
     # Simulation hyperparameters
     n_simulations = CONFIGURATION['n_simulations'] # Number of simulations to run

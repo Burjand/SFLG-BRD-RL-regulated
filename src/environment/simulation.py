@@ -48,7 +48,7 @@ class Simulation():
         self.reward_giver = Reward(self.reward_function_name)
 
         # Setup the Regulatory Agent
-        self.regulatory_agent = RA_setup(self.main_rng, self.n_brd_players)
+        self.regulatory_agent = RA_setup(self.n_brd_players)
 
     def run_FLG_BRD_simulation(self):
 
@@ -87,7 +87,7 @@ class Simulation():
                 players_find_best_response[player_in_turn] = False
 
             players_positions = [self.BRD.players[player]['facility_position'] for player in range(self.BRD.n_players)]
-            St_plus_1 = adj_matrix + demands + players_positions           
+            St_plus_1 = adj_matrix + demands + players_positions
 
             # Reward calculation
             potential_function_current_value = self.BRD.calculate_potential_function()
@@ -101,13 +101,16 @@ class Simulation():
             # Prepare for next iteration
             St = St_plus_1
             episode_reward += r
-            print(r)
 
             # Simulation development study
             t += 1
             potential_function_development.append(potential_function_current_value)
             snapshot = {pid: copy.deepcopy(data) for pid, data in self.BRD.players.items()}
             players_development_over_time.append(snapshot)
+
+            if not any(players_find_best_response):
+
+                pass # Used to send reward at the end
                 
 
         # When the while loop ends it means that all player were not capable of finding a best response so the Nash Equilibrium is reached

@@ -1,6 +1,10 @@
-class Regulatory_Agent():
+from src.regulatory_agent.Q_learning_agent import Q_learning_agent
 
-    def __init__(self, main_rng, n_players):
+class Regulatory_Agent(Q_learning_agent):
+
+    pass
+
+    """def __init__(self, main_rng, n_players):
         
         self.main_rng = main_rng
         self.n_players = n_players
@@ -10,5 +14,5 @@ class Regulatory_Agent():
 
         action = self.main_rng.choice(valid_actions) # Randomly select a player to find their best response
 
-        return action
+        return action"""
 

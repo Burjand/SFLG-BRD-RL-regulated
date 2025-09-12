@@ -116,7 +116,7 @@ class Q_learning_agent():
         return np.random.choice(best_actions) # Choose randomly one of those actions
 
 
-    def compute_n_step_return(self, tau, T):
+    def compute_n_step_return(self, tau, T=None):
         """
         Compute the n-step return G_{tau}^{(n)} starting at time tau,
         using self.states and self.rewards, without indexing past the end.
@@ -125,19 +125,32 @@ class Q_learning_agent():
         gamma = self.gamma
         G = 0.0
 
-        up_to = min(tau + n, T) # Determine the last time index for which we will include actual rewards.
-        for i in range(tau+1, up_to): # Loop over reward indices r_{tau+1}, r_{tau+2}, ..., r_{up_to}.
-            G += (gamma**(i - (tau+1))) * self.rewards[i] 
+        R = len(self.rewards)  # number of rewards currently in buffer
+        if tau < 0 or tau >= max(1, len(self.states)):  # defensive
+            return 0.0
 
-        # If the episode does NOT terminate within the n steps (i.e., tau + n < T), then we bootstrap from the value estimate at state s_{tau+n}.
-        if tau + n < T:
+        # If there are no rewards available from tau, return 0
+        if tau >= R:
+            return 0.0
 
-            G += (gamma**n) * np.max(self.q_table[self.states[tau + n]])
+        # number of actual rewards we can sum starting at tau
+        k = min(n, R - tau)  # k >= 1 when tau < R
+
+        # sum the k actual rewards: r_{tau}, r_{tau+1}, ..., r_{tau+k-1}
+        for j in range(k):
+            G += (gamma ** j) * self.rewards[tau + j]
+
+        # bootstrap if we have at least n rewards available after tau
+        # i.e., if tau + n < R  (there exists rewards[tau + n])
+        if tau + n < R:
+            # bootstrap from state s_{tau + n}
+            s_boot = self.states[tau + n]
+            G += (gamma ** n) * np.max(self.q_table[s_boot])
 
         return G
     
 
-    def learn(self, St, a, r, St_plus_1, done, t, T):
+    def learn(self, St, a, r, St_plus_1, done, t, T=None):
         """
         Updates the agent's internal model or policy based on the feedback
         received from the environment after taking an action.
@@ -151,39 +164,43 @@ class Q_learning_agent():
             t (int): The current time step
             T (int): Indicator of terminal state
         """
-        n = self.n
         alpha = self.alpha
-        gamma = self.gamma
 
-        # Ensure states are hashable keys
+        # make states hashable tuples
         St = tuple(St)
         St_plus_1 = tuple(St_plus_1)
 
-        # If this is the very first call in the episode, the states buffer may be empty.
-        if self.states == []:
+        # initialize buffers for the episode if empty
+        if not self.states:
             self.states.append(St)
-        
-        # Append the next state, the action taken, and the reward observed.
+
+        # append observed transition
         self.states.append(St_plus_1)
         self.actions.append(a)
         self.rewards.append(r)
-        
-        tau = t - n + 1 # Determine the time index whose n-step return is now available for update
 
-        # If tau >= 0, we have collected enough subsequent rewards (or reached a terminal) to compute the n-step return for time tau and update Q(s_tau, a_tau)
+        # tau: the state index whose n-step return becomes available now
+        tau = t - self.n + 1
+
+        # update if enough data available for tau
         if tau >= 0:
+            G = self.compute_n_step_return(tau)
+            s_tau = self.states[tau]
+            a_tau = self.actions[tau]
+            self.q_table[s_tau][a_tau] += alpha * (G - self.q_table[s_tau][a_tau])
 
-            G = self.compute_n_step_return(tau, T)            
-            self.q_table[self.states[tau]][self.actions[tau]] += alpha*(G - self.q_table[self.states[tau]][self.actions[tau]])
-
+        # if episode finished, finish all remaining updates
         if done:
-            for new_tau_idx in range(tau + 1, len(self.actions)): # Iterate up to the last action's index
+            # last valid tau corresponds to the last action index (len(rewards)-1)
+            last_tau = len(self.rewards) - 1
+            start_tau = max(0, tau + 1)
+            for new_tau in range(start_tau, last_tau + 1):
+                G = self.compute_n_step_return(new_tau)
+                s_new = self.states[new_tau]
+                a_new = self.actions[new_tau]
+                self.q_table[s_new][a_new] += alpha * (G - self.q_table[s_new][a_new])
 
-                G = self.compute_n_step_return(new_tau_idx, T)
-
-                current_q_value = self.q_table[self.states[new_tau_idx]][self.actions[new_tau_idx]]
-                self.q_table[self.states[new_tau_idx]][self.actions[new_tau_idx]] = current_q_value + alpha * (G - current_q_value)
-
+            # clear episode buffers
             self.states, self.actions, self.rewards = [], [], []
 
 

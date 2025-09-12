@@ -244,22 +244,46 @@ class Simulation():
 
         # Show the results of the simulation
         # Plotting simulation development
-            plt.figure(figsize=(10, 12))
+            plt.figure(1, figsize=(10, 12))           
 
-            smoothnes = 25
+            window = 25
             sum_iter = 0
             history_iterations_smoothed = []
             for i in range(len(history_iterations)):
                 sum_iter += history_iterations[i]
-                if (i+1) % smoothnes == 0:
-                    history_iterations_smoothed.append(sum_iter/smoothnes)
+                if (i+1) % window == 0:
+                    history_iterations_smoothed.append(sum_iter/window)
                     sum_iter = 0
 
             x = [i+1 for i in range(len(history_iterations_smoothed))]
+
+            plt.title("Iterations necessary to achieve equilibrium (smoothed)")
+            plt.xlabel(f"Simulation number (Averaged {window})")
+            plt.ylabel("Average necessary iterations")
+            plt.grid(True)
             plt.plot(x, history_iterations_smoothed)
-
-
             plt.tight_layout()
+
+            plt.figure(2, figsize=(10, 12))           
+
+            window = 25
+            sum_iter = 0
+            history_rewards_smoothed = []
+            for i in range(len(history_rewards)):
+                sum_iter += history_rewards[i]
+                if (i+1) % window == 0:
+                    history_rewards_smoothed.append(sum_iter/window)
+                    sum_iter = 0
+
+            x = [i+1 for i in range(len(history_rewards_smoothed))]
+
+            plt.title("Reward through each episode (smoothed)")
+            plt.xlabel(f"Simulation number (Averaged {window})")
+            plt.ylabel("Average reward")
+            plt.grid(True)
+            plt.plot(x, history_rewards_smoothed)
+            plt.tight_layout()
+
             plt.show()
         
 

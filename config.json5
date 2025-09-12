@@ -14,7 +14,6 @@
     weight_distribution: ["normal",5,1],
 
     //Regulatory agent hyperparameters
-    RLagent_type: "Double_Qlearning",
     learn_from_scratch: true,
     alpha: 0.15,
     gamma: 0.99,
@@ -24,6 +23,6 @@
     optimistic_value: 100,
     n: 9, // n-steps bootstrap
     reward_function_name: "iterations",
-    plan: false,
+    plan: true,
     planning_time: 5,
 }

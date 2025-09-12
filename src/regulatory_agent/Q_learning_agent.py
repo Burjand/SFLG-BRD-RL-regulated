@@ -126,7 +126,7 @@ class Q_learning_agent():
         G = 0.0
 
         up_to = min(tau + n, T) # Determine the last time index for which we will include actual rewards.
-        for i in range(tau+1, up_to+1): # Loop over reward indices r_{tau+1}, r_{tau+2}, ..., r_{up_to}.
+        for i in range(tau+1, up_to): # Loop over reward indices r_{tau+1}, r_{tau+2}, ..., r_{up_to}.
             G += (gamma**(i - (tau+1))) * self.rewards[i] 
 
         # If the episode does NOT terminate within the n steps (i.e., tau + n < T), then we bootstrap from the value estimate at state s_{tau+n}.
@@ -183,7 +183,7 @@ class Q_learning_agent():
 
                 current_q_value = self.q_table[self.states[new_tau_idx]][self.actions[new_tau_idx]]
                 self.q_table[self.states[new_tau_idx]][self.actions[new_tau_idx]] = current_q_value + alpha * (G - current_q_value)
-                
+
             self.states, self.actions, self.rewards = [], [], []
 
 

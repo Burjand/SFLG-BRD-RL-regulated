@@ -1,19 +1,29 @@
 {
     //Simulation hyperparameters
-    n_simulations: 1,
+    n_simulations: 1000,
+    max_iterations: 1000,
 
     //Environment hyperparameters
-    n_nodes: 10,
-    n_potential_facilities: 8,
-    n_brd_players: 2,
+    n_nodes: 100,
+    n_potential_facilities: 80,
+    n_brd_players: 10,
     max_iterations: 1000,
     seed: 66,    
     convergence_threshold: 1e-5,
-    demand_distribution: ['normal',20,5],
-    weight_distribution: ['normal',5,1],
+    demand_distribution: ["normal",20,5],
+    weight_distribution: ["normal",5,1],
 
     //Regulatory agent hyperparameters
-    reward_function_name: 'potential_function_minus_iterations',
+    RLagent_type: "Double_Qlearning",
+    learn_from_scratch: true,
+    alpha: 0.15,
+    gamma: 0.99,
+    epsilon: 1.0,
+    epsilon_decay_rate: 0.9997,
+    epsilon_min: 0.1,
+    optimistic_value: 100,
+    n: 9, // n-steps bootstrap
+    reward_function_name: "iterations",
     plan: false,
     planning_time: 5,
 }

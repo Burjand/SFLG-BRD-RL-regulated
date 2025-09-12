@@ -24,6 +24,14 @@ if __name__ == "__main__":
     cost_distribution = tuple(CONFIGURATION['weight_distribution']) # The distribution of the graph's costs (edge weights)
 
     # Regulatory Agent hyperparameters
+    learn_from_scratch = CONFIGURATION['learn_from_scratch']
+    alpha = CONFIGURATION['alpha']
+    gamma = CONFIGURATION['gamma']
+    epsilon = CONFIGURATION['epsilon']
+    epsilon_decay_rate = CONFIGURATION['epsilon_decay_rate']
+    epsilon_min = CONFIGURATION['epsilon_min']
+    optimistic_value = CONFIGURATION['optimistic_value']
+    n_step_bootstrap = CONFIGURATION['n'] # n-steps bootstrap
     reward_function_name =  CONFIGURATION['reward_function_name']
     plan = CONFIGURATION['plan']
     planning_time = CONFIGURATION['planning_time']
@@ -37,6 +45,14 @@ if __name__ == "__main__":
                             seed,
                             demand_distribution,
                             cost_distribution,
+                            learn_from_scratch,
+                            alpha,
+                            gamma,
+                            epsilon,
+                            epsilon_decay_rate,
+                            epsilon_min,
+                            optimistic_value,
+                            n_step_bootstrap,
                             plan,
                             planning_time,
                             reward_function_name = reward_function_name
@@ -50,8 +66,8 @@ if __name__ == "__main__":
     else:
 
         assert (isinstance(n_simulations, int) and n_simulations > 1)
-        avg_iterations, potential_function_developments_per_iteration, players_development_per_iteration = simulation.run_simulations(n_simulations)
-        simulation.show_multiple_simulations_results(avg_iterations, potential_function_developments_per_iteration, players_development_per_iteration)
+        history_iterations, history_rewards, potential_function_developments_per_iteration, players_developments_per_iteration = simulation.run_simulations(n_simulations)
+        simulation.show_multiple_simulations_results(history_iterations, history_rewards, potential_function_developments_per_iteration, players_developments_per_iteration)
         
 
 

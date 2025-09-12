@@ -101,13 +101,16 @@ class Simulation():
         potential_function_development = [] # Track how the potential function changes over time        
         players_development_over_time = [] # Track players' assignments over time
         episode_reward = 0
+        r = 0
         T = self.max_iterations
 
-        # Main simulation loop
-        while not done:            
+        # Main simulation loop        
+        while not done:        
+
+            t += 1    
         
             # Regulatory agent chooses action
-            valid_actions = tuple([i for i in range(self.n_brd_players)])
+            valid_actions = tuple(range(self.n_brd_players))
             player_in_turn = self.regulatory_agent.choose_action(St, valid_actions) # The action is the turn of a player
             action = player_in_turn
 
@@ -118,35 +121,31 @@ class Simulation():
             else:
                 players_find_best_response[player_in_turn] = False
 
+            done = False if any(players_find_best_response) and t < self.max_iterations else True # Check if simulation should end
+
             players_positions = [self.BRD.players[player]['facility_position'] for player in range(self.BRD.n_players)]
             St_plus_1 = adj_matrix + demands + players_positions
 
             # Reward calculation
             potential_function_current_value = self.BRD.calculate_potential_function()
-            r = self.reward_giver.reward_function(t)
-            print(r)
 
             # RA learning and planning
+            if done: # Reward at the end of the episode
+                r = self.reward_giver.reward_function(t)
+                episode_reward = r
+                self.regulatory_agent.reduce_exploration_rate()  
+            
             self.regulatory_agent.learn(St, action, r, St_plus_1, done, t, T)
             if self.plan:
                 self.regulatory_agent.plan(self.planning_time, St, action, r, St_plus_1)
 
             # Prepare for next iteration
             St = St_plus_1
-            episode_reward += r
 
-            # Simulation development study
-            t += 1
+            # Simulation development study            
             potential_function_development.append(potential_function_current_value)
             snapshot = {pid: copy.deepcopy(data) for pid, data in self.BRD.players.items()}
-            players_development_over_time.append(snapshot)
-
-            done = False if any(players_find_best_response) and t < self.max_iterations else True
-
-            if done:
-                self.regulatory_agent.reduce_exploration_rate()  
-
-                
+            players_development_over_time.append(snapshot)                
 
         # When the while loop ends it means that all player were not capable of finding a best response
         return t, potential_function_development, players_development_over_time, episode_reward

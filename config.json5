@@ -1,7 +1,7 @@
 {
     //Simulation hyperparameters
     n_simulations: 1000,
-    max_iterations: 1000,
+    max_iterations: 500,
 
     //Environment hyperparameters
     n_nodes: 100,
@@ -14,6 +14,7 @@
     weight_distribution: ["normal",5,1],
 
     //Regulatory agent hyperparameters
+    agent_architecture: "q_learning_agent", //Options so far: q_learning_agent, drunk_agent
     learn_from_scratch: true,
     alpha: 0.15,
     gamma: 0.99,

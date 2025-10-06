@@ -12,7 +12,7 @@ if __name__ == "__main__":
 
     # Simulation hyperparameters
     n_simulations = CONFIGURATION['n_simulations'] # Number of simulations to run
-    seed = CONFIGURATION['seed'] 
+    seed = CONFIGURATION['seed']
 
     # Environment hyperparameters
     n_nodes = CONFIGURATION['n_nodes']    # Number of nodes in the graph
@@ -55,7 +55,7 @@ if __name__ == "__main__":
                             n_step_bootstrap,
                             plan,
                             planning_time,
-                            reward_function_name = reward_function_name
+                            reward_function_name
                             )
     
     # Run simulations
@@ -67,7 +67,7 @@ if __name__ == "__main__":
 
         assert (isinstance(n_simulations, int) and n_simulations > 1)
         history_iterations, history_rewards, potential_function_developments_per_iteration, players_developments_per_iteration = simulation.run_simulations(n_simulations)
-        simulation.show_multiple_simulations_results(history_iterations, history_rewards, potential_function_developments_per_iteration, players_developments_per_iteration)
+        simulation.show_multiple_simulations_results(history_iterations, history_rewards, potential_function_developments_per_iteration, players_developments_per_iteration, graph_smoothnes=5)
         
 
 

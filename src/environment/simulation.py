@@ -240,11 +240,11 @@ class Simulation():
             plt.show()
             
 
-    def show_multiple_simulations_results(self, history_iterations, history_rewards, potential_function_developments_per_iteration, players_developments_per_iteration):
+    def show_multiple_simulations_results(self, history_iterations, history_rewards, potential_function_developments_per_iteration, players_developments_per_iteration, graph_smoothnes=25):
 
         # Show the results of the simulation
         # Plotting simulation development
-            plt.figure(1, figsize=(10, 12))           
+            plt.figure(1, figsize=(10, 12))
 
             window = 25
             sum_iter = 0
@@ -266,7 +266,7 @@ class Simulation():
 
             plt.figure(2, figsize=(10, 12))           
 
-            window = 25
+            window = graph_smoothnes
             sum_iter = 0
             history_rewards_smoothed = []
             for i in range(len(history_rewards)):

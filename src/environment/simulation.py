@@ -55,6 +55,12 @@ class Simulation():
                                        weight_distribution = self.weight_distribution)
         assert all(isinstance(node, int) for node in self.FLG_env.graph.nodes()) # Check that nodes were correctly generated (Just in case)
 
+        # Precompute flattened adjacency and demands as numpy arrays (static parts of the state)
+        adj_flat = flatten(self.FLG_env.adj_matrix)
+        self._adj_array = np.asarray(adj_flat, dtype=np.float64)
+        demands = [int(d) for d in self.FLG_env.node_demand.values()]
+        self._demand_array = np.asarray(demands, dtype=np.float64)
+
         # Calculate all distances between nodes using Dijkstra's algorithm for computational efficiency
         self.distances = a_tools().calculate_distance_matrix(self.FLG_env.graph)
 
@@ -69,14 +75,18 @@ class Simulation():
 
         # Setup Regulatory Agent
         self.regulatory_agent = RA_setup(max_possible_actions = self.n_brd_players,
-                                         alpha = self.alpha,
+                                         #alpha = self.alpha,
                                          gamma = self.gamma,
                                          epsilon = self.epsilon,
                                          epsilon_decay_rate = self.epsilon_decay_rate,
                                          epsilon_min = self.epsilon_min,
                                          optimistic_value = self.optimistic_value,
-                                         n = self.n,
+                                         #n = self.n,
                                          learn_from_scratch = self.learn_from_scratch)
+        
+        self._static_state = np.concatenate([self._adj_array, self._demand_array])
+        self._player_slice_start = self._static_state.size
+        self._player_slice_len = self.n_brd_players
 
     def run_FLG_BRD_simulation(self):
 
@@ -89,12 +99,26 @@ class Simulation():
             players_development_over_time (list): Players' facility assignments for each iteration
         """
 
+        # Local bindings to avoid attribute lookup overhead
+        BRD = self.BRD
+        RA = self.regulatory_agent
+        reward_giver = self.reward_giver
+        max_iter = self.max_iterations
+        n_players = self.n_brd_players
+        plan_enabled = self.plan
+        planning_time = self.planning_time
+        T = max_iter
+        static_state = self._static_state
+        player_slice_start = self._player_slice_start
+        player_slice_len = self._player_slice_len
+
         # Best Response Dynamics process
-        players_find_best_response = [True] * self.n_brd_players
-        adj_matrix = flatten(self.FLG_env.adj_matrix)
-        demands = [int(demand) for demand in self.FLG_env.node_demand.values()]
-        players_positions = [self.BRD.players[player]['facility_position'] for player in range(self.BRD.n_players)]
-        St = adj_matrix + demands + players_positions
+        players_find_best_response = np.ones(n_players, dtype=np.bool_)
+        players_positions = np.array([BRD.players[p]['facility_position'] for p in range(BRD.n_players)], dtype=np.int64)
+        St = np.empty(static_state.size + player_slice_len, dtype=np.float64) # Initial state vector
+        St[:static_state.size] = static_state
+        St[static_state.size:] = players_positions
+        valid_actions = tuple(range(n_players))
         done = False
 
         t = 0 # Iterations
@@ -102,42 +126,44 @@ class Simulation():
         players_development_over_time = [] # Track players' assignments over time
         episode_reward = 0
         r = 0
-        T = self.max_iterations
 
         # Main simulation loop        
-        while not done:        
+        while t < max_iter and players_find_best_response.any():    
 
             t += 1    
         
             # Regulatory agent chooses action
-            valid_actions = tuple(range(self.n_brd_players))
-            player_in_turn = self.regulatory_agent.choose_action(St, valid_actions) # The action is the turn of a player
+            player_in_turn = self.regulatory_agent.choose_action(tuple(St.tolist()), valid_actions) # The action is the turn of a player
             action = player_in_turn
 
             # Environment simulation step
             updated = self.BRD.find_best_response(player_in_turn)
             if updated:
-                players_find_best_response = [True] * self.n_brd_players  # Force recheck all players
+                players_find_best_response[:] = True  # Force recheck all players
             else:
                 players_find_best_response[player_in_turn] = False
 
             done = False if any(players_find_best_response) and t < self.max_iterations else True # Check if simulation should end
 
-            players_positions = [self.BRD.players[player]['facility_position'] for player in range(self.BRD.n_players)]
-            St_plus_1 = adj_matrix + demands + players_positions
+            players_positions[:] = [BRD.players[player]['facility_position'] for player in range(BRD.n_players)]
+            St_plus_1 = copy.deepcopy(St)
+            St_plus_1[player_slice_start:] = players_positions
 
             # Reward calculation
             potential_function_current_value = self.BRD.calculate_potential_function()
 
-            # RA learning and planning
+            # Learning and planning
+            done = not players_find_best_response.any() or t >= max_iter
             if done: # Reward at the end of the episode
-                r = self.reward_giver.reward_function(t)
+                r = reward_giver.reward_function(t)
                 episode_reward = r
-                self.regulatory_agent.reduce_exploration_rate()  
+                RA.reduce_exploration_rate()
             
-            self.regulatory_agent.learn(St, action, r, St_plus_1, done, t, T)
-            if self.plan:
-                self.regulatory_agent.plan(self.planning_time, St, action, r, St_plus_1)
+            St_prepared = tuple(St.tolist())
+            St_plus_1_prepared = tuple(St_plus_1.tolist())
+            RA.learn(St_prepared, action, r, St_plus_1_prepared, done, t, T)
+            if plan_enabled:
+                RA.plan(planning_time, St_prepared, action, r, St_plus_1_prepared)
 
             # Prepare for next iteration
             St = St_plus_1

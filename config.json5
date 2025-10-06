@@ -1,6 +1,6 @@
 {
     //Simulation hyperparameters
-    n_simulations: 1000,
+    n_simulations: 250,
     max_iterations: 500,
 
     //Environment hyperparameters
@@ -14,15 +14,15 @@
     weight_distribution: ["normal",5,1],
 
     //Regulatory agent hyperparameters
-    agent_architecture: "q_learning_agent", //Options so far: q_learning_agent, drunk_agent
+    agent_architecture: "montecarlo", //Options so far: q_learning, drunk, montecarlo
     learn_from_scratch: true,
-    alpha: 0.15,
-    gamma: 0.99,
-    epsilon: 1.0,
-    epsilon_decay_rate: 0.9997,
-    epsilon_min: 0.1,
-    optimistic_value: 100,
-    n: 9, // n-steps bootstrap
+    alpha: 0.15,    // Importance of new experiences
+    gamma: 0.99,    // Importance of future rewards
+    epsilon: 0.5,   // Exploration
+    epsilon_decay_rate: 0.995,
+    epsilon_min: 0.05,
+    optimistic_value: 10,
+    n: 2, // n-steps bootstrap
     reward_function_name: "iterations",
     plan: true,
     planning_time: 5,

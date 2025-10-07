@@ -3,7 +3,7 @@ import gzip, pickle as pk, os
 from collections import defaultdict
 from typing import Iterable, Tuple, Any
 
-# IMplemented with ChatGPT for fast testing
+# Implemented with ChatGPT for quick testing
 class Montecarlo_agent:
     """
     On-policy First-Visit Monte-Carlo (episodic) agent with epsilon-soft policy (epsilon-greedy).

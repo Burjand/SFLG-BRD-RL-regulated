@@ -161,9 +161,12 @@ class Simulation():
             
             St_prepared = tuple(St.tolist())
             St_plus_1_prepared = tuple(St_plus_1.tolist())
-            RA.learn(St_prepared, action, r, St_plus_1_prepared, done, t, T)
-            if plan_enabled:
-                RA.plan(planning_time, St_prepared, action, r, St_plus_1_prepared)
+
+            if not self.learn_from_scratch:
+                print(r)
+                RA.learn(St_prepared, action, r, St_plus_1_prepared, done, t, T)
+                if plan_enabled:
+                    RA.plan(planning_time, St_prepared, action, r, St_plus_1_prepared)
 
             # Prepare for next iteration
             St = St_plus_1
@@ -203,7 +206,8 @@ class Simulation():
             players_developments_per_iteration.append(players_development_over_time) # (List of lists)
 
         #avg_iterations = stats.mean(history_iterations)
-        self.regulatory_agent.memorize_knowledge()
+        if self.learn_from_scratch:
+            self.regulatory_agent.memorize_knowledge()
 
         return history_iterations, history_rewards, potential_function_developments_per_iteration, players_developments_per_iteration
     
@@ -282,6 +286,7 @@ class Simulation():
                     sum_iter = 0
 
             x = [i+1 for i in range(len(history_iterations_smoothed))]
+            print(f"Average amount of iterations: {stats.mean(history_iterations)}")
 
             plt.title("Iterations necessary to achieve equilibrium (smoothed)")
             plt.xlabel(f"Simulation number (Averaged {window})")
@@ -290,7 +295,7 @@ class Simulation():
             plt.plot(x, history_iterations_smoothed)
             plt.tight_layout()
 
-            plt.figure(2, figsize=(10, 12))           
+            """plt.figure(2, figsize=(10, 12))           
 
             window = graph_smoothnes
             sum_iter = 0
@@ -308,7 +313,7 @@ class Simulation():
             plt.ylabel("Average reward")
             plt.grid(True)
             plt.plot(x, history_rewards_smoothed)
-            plt.tight_layout()
+            plt.tight_layout()"""
 
             plt.show()
         

@@ -1,12 +1,12 @@
 {
     //Simulation hyperparameters
-    n_simulations: 250,
+    n_simulations: 10000,
     max_iterations: 500,
 
     //Environment hyperparameters
-    n_nodes: 100,
-    n_potential_facilities: 80,
-    n_brd_players: 10,
+    n_nodes: 20,
+    n_potential_facilities: 16,
+    n_brd_players: 5,
     max_iterations: 1000,
     seed: 66,    
     convergence_threshold: 1e-5,
@@ -14,16 +14,16 @@
     weight_distribution: ["normal",5,1],
 
     //Regulatory agent hyperparameters
-    agent_architecture: "montecarlo", //Options so far: q_learning, drunk, montecarlo
-    learn_from_scratch: true,
+    agent_architecture: "drunk", //Options so far: q_learning, drunk, montecarlo
+    learn_from_scratch: false,
     alpha: 0.15,    // Importance of new experiences
     gamma: 0.99,    // Importance of future rewards
     epsilon: 0.5,   // Exploration
-    epsilon_decay_rate: 0.995,
+    epsilon_decay_rate: 0.99,
     epsilon_min: 0.05,
     optimistic_value: 10,
     n: 2, // n-steps bootstrap
     reward_function_name: "iterations",
-    plan: true,
+    plan: false,
     planning_time: 5,
 }

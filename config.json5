@@ -1,6 +1,6 @@
 {
     //Simulation hyperparameters
-    n_simulations: 1000,
+    n_simulations: 2000,
     max_iterations: 500,
 
     //Environment hyperparameters

@@ -89,12 +89,15 @@ class Simulation():
                                          n = self.n,
                                          learn_from_scratch = self.learn_from_scratch)
         
-        self._static_state = np.concatenate([self._adj_array, self._demand_array])
-        self._player_slice_start = self._static_state.size
-        self._player_slice_len = self.n_brd_players
-        print(f"Demand array: {self._demand_array}")
-        ### DEBUG ###
-        print(f"Static state: {self._static_state}")
+        self._static_state = np.concatenate([self._adj_array, self._demand_array]).tolist()
+        self._player_positions_slice_start = int(self._static_state.size)
+        self._player_positions_len = int(self.n_brd_players)
+
+        self._player_utilities_slice_start = self._player_positions_slice_start + self._player_positions_len
+        self._player_utilities_len = int(self.n_brd_players)
+
+        self._player_slice_len = self._player_positions_len + self._player_utilities_len
+        
 
     def run_FLG_BRD_simulation(self):
 
@@ -117,15 +120,21 @@ class Simulation():
         planning_time = self.planning_time
         T = max_iter
         static_state = self._static_state
-        player_slice_start = self._player_slice_start
-        player_slice_len = self._player_slice_len
+        pos_start = self._player_positions_slice_start
+        pos_len = self._player_positions_len
+        util_start = self._player_utilities_slice_start
+        util_len = self._player_utilities_len
+        dynamic_len = pos_len + util_len
 
         # Best Response Dynamics process
         players_find_best_response = np.ones(n_players, dtype=np.bool_)
         players_positions = np.array([BRD.players[p]['facility_position'] for p in range(BRD.n_players)], dtype=np.int64)
-        St = np.empty(static_state.size + player_slice_len, dtype=np.float64) # Initial state vector
+        players_utilities = np.asarray([BRD.players[p].get('Utility', 0.0) for p in range(n_players)],dtype=np.float64)
+        St = np.empty(static_state.size + dynamic_len, dtype=np.float64) # Initial state vector
         St[:static_state.size] = static_state
-        St[static_state.size:] = players_positions
+        St[pos_start: pos_start + pos_len] = players_positions
+        St[util_start: util_start + util_len] = players_utilities
+
         valid_actions = tuple(range(n_players))
         done = False
 
@@ -141,11 +150,11 @@ class Simulation():
             t += 1    
         
             # Regulatory agent chooses action
-            player_in_turn = self.regulatory_agent.choose_action(tuple(St.tolist()), valid_actions) # The action is the turn of a player
+            player_in_turn = RA.choose_action(tuple(St.tolist()), valid_actions) # The action is the turn of a player
             action = player_in_turn
 
             # Environment simulation step
-            updated = self.BRD.find_best_response(player_in_turn)
+            updated = BRD.find_best_response(player_in_turn)
             if updated:
                 players_find_best_response[:] = True  # Force recheck all players
             else:
@@ -153,9 +162,12 @@ class Simulation():
 
             done = False if any(players_find_best_response) and t < self.max_iterations else True # Check if simulation should end
 
-            players_positions[:] = [BRD.players[player]['facility_position'] for player in range(BRD.n_players)]
+            players_positions[:] = [BRD.players[p]['facility_position'] for p in range(n_players)]
+            players_utilities[:] = [BRD.players[p].get('utility', 0.0) for p in range(n_players)]
+
             St_plus_1 = copy.deepcopy(St)
-            St_plus_1[player_slice_start:] = players_positions
+            St_plus_1[pos_start: pos_start + pos_len] = players_positions
+            St_plus_1[util_start: util_start + util_len] = players_utilities
 
             # Reward calculation
             potential_function_current_value = self.BRD.calculate_potential_function()

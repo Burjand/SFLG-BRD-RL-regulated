@@ -38,6 +38,8 @@ if __name__ == "__main__":
     reward_function_name =  CONFIGURATION['reward_function_name']
     plan = CONFIGURATION['plan']
     planning_time = CONFIGURATION['planning_time']
+    eligibility_lambda = CONFIGURATION['eligibility_lambda']
+    k_movement_memory = CONFIGURATION['k_movement_memory']
 
     # --- SIMULATION ---
     # Setup simulation
@@ -51,6 +53,7 @@ if __name__ == "__main__":
                             compact_states,
                             num_boxes,
                             distribution,
+                            k_movement_memory,
                             learn_from_scratch,
                             alpha,
                             gamma,
@@ -61,7 +64,8 @@ if __name__ == "__main__":
                             n_step_bootstrap,
                             plan,
                             planning_time,
-                            reward_function_name
+                            reward_function_name,
+                            eligibility_lambda
                             )
     
     # Run simulations

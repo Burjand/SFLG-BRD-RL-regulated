@@ -8,10 +8,11 @@ from src.environment.tools.general_tools import flatten, pack
 from src.environment.best_response_dynamics import BRD as BRD_setup
 from src.regulatory_agent.regulatory_agent import Regulatory_Agent as RA_setup
 from src.environment.rewards import Reward
+from src.environment.observation import update_movement_flags
 
 class Simulation():
 
-    def __init__(self, n_nodes, n_potential_facilities, n_brd_players, max_iterations, seed, demand_distribution, weight_distribution, compact_states, num_boxes, distribution, learn_from_scratch, alpha, gamma, epsilon, epsilon_decay_rate, epsilon_min, optimistic_value, n_steps_bootstrap, plan, planning_time, reward_function_name):
+    def __init__(self, n_nodes, n_potential_facilities, n_brd_players, max_iterations, seed, demand_distribution, weight_distribution, compact_states, num_boxes, distribution, k_movement_memory, learn_from_scratch, alpha, gamma, epsilon, epsilon_decay_rate, epsilon_min, optimistic_value, n_steps_bootstrap, plan, planning_time, reward_function_name, eligibility_lambda):
 
         # Environment
         self.n_nodes = n_nodes
@@ -22,22 +23,26 @@ class Simulation():
         self.main_rng = np.random.default_rng(seed=self.seed)
         self.demand_distribution = demand_distribution
         self.weight_distribution = weight_distribution
+
+        # State observation
         self.compact_states = compact_states
         self.num_boxes = num_boxes
         self.distribution = distribution
+        self.k_movement_memory = k_movement_memory
 
         # Regulatory agent
         self.learn_from_scratch = learn_from_scratch
         self.alpha = alpha
         self.gamma = gamma
-        self.epsilon = epsilon
+        self.epsilon = epsilon if learn_from_scratch else epsilon_min
         self.epsilon_decay_rate = epsilon_decay_rate
         self.epsilon_min = epsilon_min
         self.optimistic_value = optimistic_value
         self.n = n_steps_bootstrap
         self.plan = plan
         self.planning_time = planning_time
-        self.reward_function_name = reward_function_name 
+        self.reward_function_name = reward_function_name
+        self.eligibility_lambda = eligibility_lambda
 
         self.setup_simulation()
 
@@ -90,13 +95,6 @@ class Simulation():
                                          learn_from_scratch = self.learn_from_scratch)
         
         self._static_state = np.concatenate([self._adj_array, self._demand_array]).tolist()
-        self._player_positions_slice_start = int(self._static_state.size)
-        self._player_positions_len = int(self.n_brd_players)
-
-        self._player_utilities_slice_start = self._player_positions_slice_start + self._player_positions_len
-        self._player_utilities_len = int(self.n_brd_players)
-
-        self._player_slice_len = self._player_positions_len + self._player_utilities_len
         
 
     def run_FLG_BRD_simulation(self):
@@ -120,20 +118,18 @@ class Simulation():
         planning_time = self.planning_time
         T = max_iter
         static_state = self._static_state
-        pos_start = self._player_positions_slice_start
-        pos_len = self._player_positions_len
-        util_start = self._player_utilities_slice_start
-        util_len = self._player_utilities_len
-        dynamic_len = pos_len + util_len
 
         # Best Response Dynamics process
         players_find_best_response = np.ones(n_players, dtype=np.bool_)
-        players_positions = np.array([BRD.players[p]['facility_position'] for p in range(BRD.n_players)], dtype=np.int64)
-        players_utilities = np.asarray([BRD.players[p].get('Utility', 0.0) for p in range(n_players)],dtype=np.float64)
-        St = np.empty(static_state.size + dynamic_len, dtype=np.float64) # Initial state vector
-        St[:static_state.size] = static_state
-        St[pos_start: pos_start + pos_len] = players_positions
-        St[util_start: util_start + util_len] = players_utilities
+        players_positions = [BRD.players[p]['facility_position'] for p in range(BRD.n_players)]
+        players_utilities = [BRD.players[p].get('Utility', 0.0) for p in range(n_players)]
+        movement_flags = [0] * n_players
+        movement_flags_memory = [0] * n_players
+
+        St = static_state + players_positions + players_utilities + [BRD.calculate_potential_function()] + movement_flags
+
+        len_players_pos = len(players_positions)
+        len_players_ut = len(players_utilities)
 
         valid_actions = tuple(range(n_players))
         done = False
@@ -150,7 +146,7 @@ class Simulation():
             t += 1    
         
             # Regulatory agent chooses action
-            player_in_turn = RA.choose_action(tuple(St.tolist()), valid_actions) # The action is the turn of a player
+            player_in_turn = RA.choose_action(tuple(St), valid_actions) # The action is the turn of a player
             action = player_in_turn
 
             # Environment simulation step
@@ -164,13 +160,11 @@ class Simulation():
 
             players_positions[:] = [BRD.players[p]['facility_position'] for p in range(n_players)]
             players_utilities[:] = [BRD.players[p].get('utility', 0.0) for p in range(n_players)]
+            potential_function_current_value = BRD.calculate_potential_function()
 
             St_plus_1 = copy.deepcopy(St)
-            St_plus_1[pos_start: pos_start + pos_len] = players_positions
-            St_plus_1[util_start: util_start + util_len] = players_utilities
-
-            # Reward calculation
-            potential_function_current_value = self.BRD.calculate_potential_function()
+            movement_flags, movement_flags_memory = update_movement_flags(player_in_turn, movement_flags, movement_flags_memory, k=self.k_movement_memory)
+            St_plus_1[-(len_players_pos + len_players_ut):] = players_positions + players_utilities  + [potential_function_current_value] + movement_flags
 
             # Learning and planning
             done = not players_find_best_response.any() or t >= max_iter
@@ -179,8 +173,8 @@ class Simulation():
                 episode_reward = r
                 RA.reduce_exploration_rate()
             
-            St_prepared = tuple(St.tolist())
-            St_plus_1_prepared = tuple(St_plus_1.tolist())
+            St_prepared = tuple(St)
+            St_plus_1_prepared = tuple(St_plus_1)
 
             if self.learn_from_scratch:
                 RA.learn(St_prepared, action, r, St_plus_1_prepared, done, t, T)

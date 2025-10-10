@@ -4,14 +4,17 @@ sys.path.append(os.path.join(os.path.dirname(__file__), 'src'))
 import src.environment.tools.general_tools as general_tools
 
 from src.regulatory_agent.Q_learning_agent import Q_learning_agent
-from regulatory_agent.drunk_agent import Drunk_agent
-from regulatory_agent.montecarlo_agent import Montecarlo_agent
+from src.regulatory_agent.drunk_agent import Drunk_agent
+from src.regulatory_agent.montecarlo_agent import Montecarlo_agent
+from src.regulatory_agent.Q_learning_eligibility_agent import Q_lambda_agent
 
 CONFIGURATION = general_tools.extract_json_data("config.json5")
 agent_architecture_text = CONFIGURATION['agent_architecture']
 
 if agent_architecture_text == "q_learning":
     agent_architecture = Q_learning_agent
+elif agent_architecture_text == "q_learning_eligibility":
+    agent_architecture = Q_lambda_agent
 elif agent_architecture_text == "drunk":
     agent_architecture = Drunk_agent
 elif agent_architecture_text == "montecarlo":
@@ -22,7 +25,10 @@ else:
 class Regulatory_Agent(agent_architecture):
 
     def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
+        if agent_architecture_text == "q_learning_eligibility":
+            super().__init__(*args, **kwargs, lambda_=CONFIGURATION['eligibility_lambda'])
+        else:
+            super().__init__(*args, **kwargs)
         print(f"Regulator architecture: '{agent_architecture_text}'")
 
 

@@ -1,18 +1,17 @@
 import copy
 import numpy as np
 import matplotlib.pyplot as plt
-import statistics as stats
 
 from src.environment.facility_location_game import FLG_environment
 from src.environment.tools.algorithm_tools import a_tools
-from src.environment.tools.general_tools import flatten
+from src.environment.tools.general_tools import flatten, pack
 from src.environment.best_response_dynamics import BRD as BRD_setup
 from src.regulatory_agent.regulatory_agent import Regulatory_Agent as RA_setup
 from src.environment.rewards import Reward
 
 class Simulation():
 
-    def __init__(self, n_nodes, n_potential_facilities, n_brd_players, max_iterations, seed, demand_distribution, weight_distribution, learn_from_scratch, alpha, gamma, epsilon, epsilon_decay_rate, epsilon_min, optimistic_value, n_steps_bootstrap, plan, planning_time, reward_function_name):
+    def __init__(self, n_nodes, n_potential_facilities, n_brd_players, max_iterations, seed, demand_distribution, weight_distribution, compact_states, num_boxes, distribution, learn_from_scratch, alpha, gamma, epsilon, epsilon_decay_rate, epsilon_min, optimistic_value, n_steps_bootstrap, plan, planning_time, reward_function_name):
 
         # Environment
         self.n_nodes = n_nodes
@@ -23,6 +22,9 @@ class Simulation():
         self.main_rng = np.random.default_rng(seed=self.seed)
         self.demand_distribution = demand_distribution
         self.weight_distribution = weight_distribution
+        self.compact_states = compact_states
+        self.num_boxes = num_boxes
+        self.distribution = distribution
 
         # Regulatory agent
         self.learn_from_scratch = learn_from_scratch
@@ -35,7 +37,7 @@ class Simulation():
         self.n = n_steps_bootstrap
         self.plan = plan
         self.planning_time = planning_time
-        self.reward_function_name = reward_function_name        
+        self.reward_function_name = reward_function_name 
 
         self.setup_simulation()
 
@@ -59,6 +61,8 @@ class Simulation():
         adj_flat = flatten(self.FLG_env.adj_matrix)
         self._adj_array = np.asarray(adj_flat, dtype=np.float64)
         demands = [int(d) for d in self.FLG_env.node_demand.values()]
+        if self.compact_states:
+            demands = pack(demands, self.num_boxes, self.distribution)
         self._demand_array = np.asarray(demands, dtype=np.float64)
 
         # Calculate all distances between nodes using Dijkstra's algorithm for computational efficiency
@@ -72,21 +76,25 @@ class Simulation():
         
         # Reward system
         self.reward_giver = Reward(self.reward_function_name)
+        print(f"Using reward type '{self.reward_function_name}'")
 
         # Setup Regulatory Agent
         self.regulatory_agent = RA_setup(max_possible_actions = self.n_brd_players,
-                                         #alpha = self.alpha,
+                                         alpha = self.alpha,
                                          gamma = self.gamma,
                                          epsilon = self.epsilon,
                                          epsilon_decay_rate = self.epsilon_decay_rate,
                                          epsilon_min = self.epsilon_min,
                                          optimistic_value = self.optimistic_value,
-                                         #n = self.n,
+                                         n = self.n,
                                          learn_from_scratch = self.learn_from_scratch)
         
         self._static_state = np.concatenate([self._adj_array, self._demand_array])
         self._player_slice_start = self._static_state.size
         self._player_slice_len = self.n_brd_players
+        print(f"Demand array: {self._demand_array}")
+        ### DEBUG ###
+        print(f"Static state: {self._static_state}")
 
     def run_FLG_BRD_simulation(self):
 
@@ -162,8 +170,7 @@ class Simulation():
             St_prepared = tuple(St.tolist())
             St_plus_1_prepared = tuple(St_plus_1.tolist())
 
-            if not self.learn_from_scratch:
-                print(r)
+            if self.learn_from_scratch:
                 RA.learn(St_prepared, action, r, St_plus_1_prepared, done, t, T)
                 if plan_enabled:
                     RA.plan(planning_time, St_prepared, action, r, St_plus_1_prepared)
@@ -286,7 +293,8 @@ class Simulation():
                     sum_iter = 0
 
             x = [i+1 for i in range(len(history_iterations_smoothed))]
-            print(f"Average amount of iterations: {stats.mean(history_iterations)}")
+            print(f"Average amount of iterations: {np.mean(history_iterations)}")
+            print(f"Standard deviation: {np.std(history_iterations)}")
 
             plt.title("Iterations necessary to achieve equilibrium (smoothed)")
             plt.xlabel(f"Simulation number (Averaged {window})")

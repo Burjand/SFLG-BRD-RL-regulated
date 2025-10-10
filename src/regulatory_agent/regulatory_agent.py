@@ -12,17 +12,17 @@ agent_architecture_text = CONFIGURATION['agent_architecture']
 
 if agent_architecture_text == "q_learning":
     agent_architecture = Q_learning_agent
-
 elif agent_architecture_text == "drunk":
     agent_architecture = Drunk_agent
-
 elif agent_architecture_text == "montecarlo":
     agent_architecture = Montecarlo_agent
-
 else:
     raise Exception("Agent architecture not recognized")
 
 class Regulatory_Agent(agent_architecture):
 
-    pass
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        print(f"Regulator architecture: '{agent_architecture_text}'")
+
 

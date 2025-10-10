@@ -22,6 +22,9 @@ if __name__ == "__main__":
     convergence_threshold = CONFIGURATION['convergence_threshold'] # Threshold used to determine convergence of the potential function (Not used in this version of the code)
     demand_distribution = tuple(CONFIGURATION['demand_distribution']) # The distribution of the graph's demand (node weights)
     cost_distribution = tuple(CONFIGURATION['weight_distribution']) # The distribution of the graph's costs (edge weights)
+    compact_states = CONFIGURATION['compact_states']
+    num_boxes = CONFIGURATION['num_boxes']
+    distribution = CONFIGURATION['distribution']
 
     # Regulatory Agent hyperparameters
     learn_from_scratch = CONFIGURATION['learn_from_scratch']
@@ -45,6 +48,9 @@ if __name__ == "__main__":
                             seed,
                             demand_distribution,
                             cost_distribution,
+                            compact_states,
+                            num_boxes,
+                            distribution,
                             learn_from_scratch,
                             alpha,
                             gamma,

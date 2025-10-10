@@ -151,47 +151,31 @@ class Q_learning_agent():
     
 
     def learn(self, St, a, r, St_plus_1, done, t, T=None):
-        """
-        Updates the agent's internal model or policy based on the feedback
-        received from the environment after taking an action.
-
-        Args:
-            St (np.array): The state before the action.
-            a (int): The action taken.
-            r (float): The reward received.
-            St_plus_1 (np.array): The state after the action.
-            done (bool): True if the episode has ended, False otherwise.
-            t (int): The current time step
-            T (int): Indicator of terminal state
-        """
         alpha = self.alpha
 
-        # make states hashable tuples
         St = tuple(St)
         St_plus_1 = tuple(St_plus_1)
 
-        # initialize buffers for the episode if empty
+        # ensure float arrays
+        self.q_table[St] = np.asarray(self.q_table[St], dtype=np.float64)
+        self.q_table[St_plus_1] = np.asarray(self.q_table[St_plus_1], dtype=np.float64)
+
         if not self.states:
             self.states.append(St)
 
-        # append observed transition
         self.states.append(St_plus_1)
-        self.actions.append(a)
-        self.rewards.append(r)
+        self.actions.append(int(a))
+        self.rewards.append(float(r))
 
-        # tau: the state index whose n-step return becomes available now
         tau = t - self.n + 1
 
-        # update if enough data available for tau
         if tau >= 0:
             G = self.compute_n_step_return(tau)
             s_tau = self.states[tau]
             a_tau = self.actions[tau]
             self.q_table[s_tau][a_tau] += alpha * (G - self.q_table[s_tau][a_tau])
 
-        # if episode finished, finish all remaining updates
         if done:
-            # last valid tau corresponds to the last action index (len(rewards)-1)
             last_tau = len(self.rewards) - 1
             start_tau = max(0, tau + 1)
             for new_tau in range(start_tau, last_tau + 1):
@@ -200,7 +184,6 @@ class Q_learning_agent():
                 a_new = self.actions[new_tau]
                 self.q_table[s_new][a_new] += alpha * (G - self.q_table[s_new][a_new])
 
-            # clear episode buffers
             self.states, self.actions, self.rewards = [], [], []
 
 

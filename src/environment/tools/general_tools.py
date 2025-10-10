@@ -1,5 +1,7 @@
 import json5
 import os
+import numpy as np
+from scipy.stats import norm
 
 def extract_json_data(file_path):
     """
@@ -29,3 +31,54 @@ def extract_json_data(file_path):
     
 def flatten(xss):
     return [x for xs in xss for x in xs]
+
+def pack(a, n, distribution):
+
+    """
+    Create n boxes of values taking into consideration the data distribution and then change the original vector to accomodate those values
+    """
+
+    # Check if values are appropiate
+    a = np.asarray(a)
+    if a.size == 0:
+        return np.array([], dtype=int)
+    if not (isinstance(n, int) and n > 0):
+        raise ValueError("n must be a positive integer")
+
+    if distribution == 'uniform':
+
+        minimum = float(a.min())
+        maximum = float(a.max())
+        if maximum == minimum:
+            return np.zeros_like(a, dtype=int)
+        
+        # Create n+1 edges equally spaced from min to max
+        boxes = np.linspace(minimum, maximum, n + 1)
+        
+        idx = np.searchsorted(boxes, a, side='right') - 1 # Assign to boxes
+        idx = np.clip(idx, 0, n - 1)
+        packed_a = idx.astype(int)
+
+    elif distribution == 'normal':
+    
+
+        the_cow = float(a.mean())
+        std = float(a.std())
+        if std == 0.0:
+            return np.zeros_like(a, dtype=int)
+        
+        z = (a - the_cow) / std
+        p = norm.cdf(z)        
+        p = np.clip(p, 0.0, 1.0) # numerical safety
+
+        boxes = np.linspace(0.0, 1.0, n + 1)
+
+        # Assign to boxes
+        idx = np.searchsorted(boxes, p, side='right') - 1
+        idx = np.clip(idx, 0, n - 1)
+        packed_a = idx.astype(int)
+
+    else:
+        raise Exception("Unknown distribution")
+    
+    return packed_a

@@ -7,3 +7,4 @@ class a_tools():
         # Calculate the distance matrix using Dijkstra's algorithm
         distance_matrix = dict(nx.all_pairs_dijkstra_path_length(G))
         return distance_matrix
+    

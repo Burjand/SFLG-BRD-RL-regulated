@@ -84,6 +84,7 @@ class Simulation():
         print(f"Using reward type '{self.reward_function_name}'")
 
         # Setup Regulatory Agent
+        if not self.learn_from_scratch: self.epsilon = self.epsilon_min #When not learning use minimum epsilon
         self.regulatory_agent = RA_setup(max_possible_actions = self.n_brd_players,
                                          alpha = self.alpha,
                                          gamma = self.gamma,
@@ -126,7 +127,7 @@ class Simulation():
         movement_flags = [0] * n_players
         movement_flags_memory = [0] * n_players
 
-        St = static_state + players_positions + players_utilities + [BRD.calculate_potential_function()] + movement_flags
+        St = static_state + players_positions
 
         len_players_pos = len(players_positions)
         len_players_ut = len(players_utilities)
@@ -164,7 +165,7 @@ class Simulation():
 
             St_plus_1 = copy.deepcopy(St)
             movement_flags, movement_flags_memory = update_movement_flags(player_in_turn, movement_flags, movement_flags_memory, k=self.k_movement_memory)
-            St_plus_1[-(len_players_pos + len_players_ut):] = players_positions + players_utilities  + [potential_function_current_value] + movement_flags
+            St_plus_1[-(len_players_pos + len_players_ut):] = players_positions
 
             # Learning and planning
             done = not players_find_best_response.any() or t >= max_iter

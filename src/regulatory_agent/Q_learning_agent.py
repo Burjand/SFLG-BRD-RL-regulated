@@ -74,8 +74,6 @@ class Q_learning_agent():
                                 for k_s, v_s in model_loaded_dict.items()}
                         )
 
-                print("Using memorized knowledge.")
-
             else:
                 print(f"{self.q_values_file_path} does not exist.")
 

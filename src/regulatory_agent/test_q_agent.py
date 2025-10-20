@@ -1,10 +1,21 @@
+import sys
+import os
+
 import numpy as np
-from Q_learning_agent import Q_learning_agent   # adjust import
+from Q_learning_agent import Q_learning_agent
+from montecarlo_agent import Montecarlo_agent
+from Q_learning_eligibility_agent import Q_lambda_agent
 from collections import defaultdict
 
 def simple_bandit_test():
     # Two actions: action 0 -> reward +1 (good), action 1 -> reward 0 (bad)
-    agent = Q_learning_agent(max_possible_actions=2, alpha=0.2, gamma=0.9,
+    """agent = Q_learning_agent(max_possible_actions=2, alpha=0.2, gamma=0.9,
+                             epsilon=0.5, epsilon_decay_rate=0.995, epsilon_min=0.01,
+                             optimistic_value=0, learn_from_scratch=True, n=1)"""
+    """agent = Montecarlo_agent(max_possible_actions=2, gamma=0.9,
+                             epsilon=0.5, epsilon_decay_rate=0.995, epsilon_min=0.01,
+                             optimistic_value=0, learn_from_scratch=True)"""
+    agent = Q_lambda_agent(max_possible_actions=2, alpha=0.2, gamma=0.9,
                              epsilon=0.5, epsilon_decay_rate=0.995, epsilon_min=0.01,
                              optimistic_value=0, learn_from_scratch=True, n=1)
 

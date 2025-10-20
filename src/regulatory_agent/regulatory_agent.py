@@ -10,6 +10,7 @@ from src.regulatory_agent.Q_learning_eligibility_agent import Q_lambda_agent
 
 CONFIGURATION = general_tools.extract_json_data("config.json5")
 agent_architecture_text = CONFIGURATION['agent_architecture']
+learning = CONFIGURATION['learn_from_scratch']
 
 if agent_architecture_text == "q_learning":
     agent_architecture = Q_learning_agent
@@ -30,5 +31,9 @@ class Regulatory_Agent(agent_architecture):
         else:
             super().__init__(*args, **kwargs)
         print(f"Regulator architecture: '{agent_architecture_text}'")
+        if learning:
+            print(f"Agent learning")
+        else:
+            print(f"Agent using memorized knowledge")
 
 

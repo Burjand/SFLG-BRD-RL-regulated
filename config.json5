@@ -1,7 +1,7 @@
 {
     // Parameters
     //Simulation
-    n_simulations: 1000,
+    n_simulations: 2000,
     max_iterations: 500,
 
     //Environmentters
@@ -21,7 +21,7 @@
     k_movement_memory: 3,
 
     //Regulatory agent
-    agent_architecture: "q_learning", //Options so far: q_learning, drunk, montecarlo
+    agent_architecture: "drunk", //Options so far: q_learning, drunk, montecarlo
     learn_from_scratch: false,
     alpha: 0.15,    // Importance of new experiences
     gamma: 0.99,    // Importance of future rewards

@@ -127,8 +127,8 @@ class Simulation():
         movement_flags = [0] * n_players
         movement_flags_memory = [0] * n_players
 
-        St = static_state + players_positions
-
+        St = static_state + players_positions + movement_flags #players_positions movement_flags [BRD.calculate_potential_function()] players_utilities
+ 
         len_players_pos = len(players_positions)
         len_players_ut = len(players_utilities)
 
@@ -165,7 +165,7 @@ class Simulation():
 
             St_plus_1 = copy.deepcopy(St)
             movement_flags, movement_flags_memory = update_movement_flags(player_in_turn, movement_flags, movement_flags_memory, k=self.k_movement_memory)
-            St_plus_1[-(len_players_pos + len_players_ut):] = players_positions
+            St_plus_1[-(len_players_pos + len_players_ut):] = players_positions + movement_flags #players_positions [potential_function_current_value] players_utilities movement_flags
 
             # Learning and planning
             done = not players_find_best_response.any() or t >= max_iter
@@ -173,6 +173,8 @@ class Simulation():
                 r = reward_giver.reward_function(t)
                 episode_reward = r
                 RA.reduce_exploration_rate()
+                ### DEBUG ###
+                #print(RA.epsilon)
             
             St_prepared = tuple(St)
             St_plus_1_prepared = tuple(St_plus_1)
@@ -211,6 +213,7 @@ class Simulation():
             
             if i%50 == 0:
                 print(f"Running simulation {i+1}/{n_simulations}...")
+                print(f"Current epsilon: {self.regulatory_agent.epsilon}")
             iterations, potential_function_development, players_development_over_time, episode_reward = self.run_FLG_BRD_simulation()
             episode_count += 1
 
@@ -310,7 +313,7 @@ class Simulation():
             plt.plot(x, history_iterations_smoothed)
             plt.tight_layout()
 
-            """plt.figure(2, figsize=(10, 12))           
+            """plt.figure(1, figsize=(10, 12))           
 
             window = graph_smoothnes
             sum_iter = 0

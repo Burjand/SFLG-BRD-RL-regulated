@@ -211,6 +211,7 @@ class Simulation():
 
         for i in range(n_simulations):
             
+            self.BRD.players = self.BRD.create_players() #Reset the players' positions
             if i%50 == 0:
                 print(f"Running simulation {i+1}/{n_simulations}...")
                 print(f"Current epsilon: {self.regulatory_agent.epsilon}")

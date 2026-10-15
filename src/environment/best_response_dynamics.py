@@ -1,17 +1,21 @@
 import numpy as np
 
+from src.environment.game_behavior import Game_behavior
+
+
 class BRD():
 
-    def __init__(self, n_players, distances, FLG_env, seed=42):
+    def __init__(self, n_players, FLG_graph, seed=42, rationality_epsilon=0.05):
 
+        self.flg_graph = FLG_graph
+        self.n_nodes = self.flg_graph.n_nodes
         self.n_players = n_players
-        self.distances = distances
-        self.nodes_demand = FLG_env.node_demand
-        self.potential_facilities = FLG_env.potential_facilities_mask
         self.seed = seed
+        self.rationality_epsilon = rationality_epsilon
         self.rng = np.random.default_rng(seed=self.seed)
 
-        self.players = self.create_players()
+        self.game_behavior = Game_behavior(self.flg_graph, n_players)
+        self.create_players()
 
 
     def create_players(self):
@@ -20,169 +24,74 @@ class BRD():
         Creates the players for the game, with initialization of facility positions at random.
 
         Returns:
-            players (dict): A dictionary containing as key the player id (an int) ad as items their facility position and their utility.
+            players (dict): A dictionary containing as key the player id (int) and as items their facility position (int) and their utility (float).
         """
 
         # Check amount of players is less than the number of available facilities
-        if self.n_players > sum(self.potential_facilities):
+        if self.n_players > self.n_nodes:
             raise ValueError("More players than available facilities.")
 
-        #print("Nodes demands: " + str(self.nodes_demand))
-        
-        # Create a dictionary of nodes where is possible to put a facility, the value is initialized to 0 to indicate that in that potential facility there is no player assigned
-        # and the key is the index of the potential facility
-        self.facility_options = {
-            i: 0 for i, is_potential in enumerate(self.potential_facilities) if is_potential == 1
-        }
+        # Potential facilities (nodes): 1 if a player was placed there, 0 if not
+        self.facilities = {i: 0 for i in range(self.n_nodes)}
 
-        # Create players and assign them to random facilities
-        players = {}
+        # Create players and assign them to random, distinct facilities
+        self.players = {}
         for i in range(self.n_players):
-            selected_random_facility = self.rng.choice(tuple(k for k, v in self.facility_options.items() if v == 0))            
-            players[i] = {'facility_position': selected_random_facility, 'Utility': None}
-            self.facility_options[selected_random_facility] = 1  # Mark the facility as occupied by a player
+            selected_random_facility = int(self.rng.choice(tuple(k for k, v in self.facilities.items() if v == 0)))
+            self.players[i] = {'facility_position': selected_random_facility, 'Utility': None}
+            self.facilities[selected_random_facility] = 1  # Mark the facility as occupied by a player
 
         # Update the utilities of all players
-        for player_data in players.values():
-            taken_facilities = [facility for facility, taken in self.facility_options.items() if taken == 1]
-            player_data['Utility'] = self.calculate_facility_utility(player_data['facility_position'], taken_facilities)
-
-        #print("Players created with their initial positions and utilities:" + str(players)) 
-
-        return players
+        facilities_utilities = self.game_behavior.calculate_facilities_utilities(self.players)
+        for i in range(self.n_players):
+            self.players[i]['Utility'] = facilities_utilities[i]
 
 
-    def find_best_response(self, player_id):
+    def compute_player_best_response(self, player_id):
 
-        """
-        Finds the best response, i.e., the facility with the highest utility the agent can take given the current situtation, then moves the agent to that facility.
+        # Store the current best facility and utility for the player
 
-        Args:
-            player_id (int): The player that will find its best response
-
-        Returns:
-            bool: if a better facility was found
-        """
-
+        action_type = np.random.choice(a=["rational_action", "irrational_action"], p=[1-self.rationality_epsilon, self.rationality_epsilon])
+        facility_options = [i for i in range(self.n_nodes)] # Consider all nodes (Allows sharing facilities)
+        change_flag = False # A flag to know if the player changed position (AKA changed strategy)
         current_facility = self.players[player_id]['facility_position']
-        best_option = current_facility
-        best_utility = self.players[player_id]['Utility']
 
-        # Temporarily free the current facility
-        self.facility_options[current_facility] = 0
+        if action_type == "rational_action":
 
-        # Evaluate all possible options (including staying at current)
-        for option in self.facility_options:
-            if self.facility_options[option] == 1:
-                continue  # Skip facilities occupied by others
+            best_option = current_facility
 
-            # Compute utility if player moves to 'option'
-            taken_facilities = [
-                f for f, taken in self.facility_options.items() if taken == 1 or f == option  # Include the new facility
-            ]
-            utility = self.calculate_facility_utility(option, taken_facilities)
-            
-            # Take the option with the highest utility
-            if utility > best_utility:
-                best_utility = utility
-                best_option = option
+            # Utility of player_id at every candidate node, the other players fixed (Algorithm 1 in the article)
+            candidate_utilities = self.game_behavior.calculate_player_utility_for_all_candidates(self.players, player_id)
+            # Current utility from the same function (not the stored one) so float32 rounding does not create fake gains
+            best_utility = float(candidate_utilities[current_facility])
+            candidate_utilities[current_facility] = -np.inf # Exclude current position
 
-        # Restore the current facility’s state
-        self.facility_options[current_facility] = 1
+            best_idx = int(np.argmax(candidate_utilities))
+            best_value = float(candidate_utilities[best_idx])
 
-        # Update if a better option was found
-        if best_option != current_facility:
-            self.facility_options[current_facility] = 0 # Leave current facility
-            self.facility_options[best_option] = 1 # Take better facility
-            self.players[player_id]['facility_position'] = best_option # Update player's facility
-            self.players[player_id]['Utility'] = best_utility #Update player's utility
+            # Move only on a gain above float32 noise.
+            tol = 1e-5 * max(1.0, abs(best_utility))
+            if best_value > best_utility + tol:
+                best_option = best_idx
+                best_utility = best_value
+                change_flag = True
+
+        else:
+
+            best_option = np.random.choice(facility_options)
+            if best_option != current_facility:
+                change_flag = True
+
+        # If it discovered a better option
+        if change_flag:
+            # Change position
+            self.players[player_id]['facility_position'] = best_option
+
+            # And update all players' utilities
+            new_utilities = self.game_behavior.calculate_facilities_utilities(self.players)
+            for i in range(self.n_players):
+                self.players[i]['Utility'] = new_utilities[i]
+
             return True
+
         return False
-
-
-    def calculate_facility_utility(self, target_facility, taken_facilities):
-
-        """
-        Calculates the utility for a target facility given the taken facilities using the distance to the nodes
-
-        Args:
-            target_facility (int): The facility being considered for taking
-            taken_facilities (list): The facilities already taken by the other players
-
-        Returns:
-            utility: The utility of the target_facility
-        """
-
-        # Utilities reward both demand capture and cost minimization
-        nearest_nodes = self.calculate_nearest_nodes(taken_facilities)
-        captured_clients = nearest_nodes.get(target_facility, [])
-        
-        # Calculate the total demand of captured clients (including the facility's own node)
-        sum_demands = sum(self.nodes_demand[c] for c in captured_clients)
-        
-        # Calculate the total cost (distances) for all captured clients
-        sum_costs = sum(self.distances[c][target_facility] for c in captured_clients)
-        
-        # Utility is the total demand minus total cost
-        utility = sum_demands - sum_costs
-        
-        return utility
-
-
-    def calculate_nearest_nodes(self, taken_facilities):
-        """
-        Calculate the nearest nodes to all facilities already taken.
-
-        Args:
-            taken_facilities (list): The facilities that have been taken by the players.
-
-        Returns:
-            facilities_nearest_nodes (dict): Each taken facility with thier correspondent nearest nodes.
-        """
-
-        # Create a dictionary where the keys are the taken facilities and the values will hold the nearest nodes to each facility
-        facilities_nearest_nodes = {facility: [] for facility in taken_facilities}
-
-        for node in self.distances:
-
-            if node in taken_facilities:
-                facilities_nearest_nodes[node].append(node)
-                continue
-
-            node_distances = self.distances[node] # Access to the disrances of the analyzed node to all other nodes
-
-            min_distance = min(node_distances[facility] for facility in taken_facilities) # Calculate the minimum distance from the analyzed node to all taken facilities
-
-            closest_facilities = [
-                facility for facility in taken_facilities if node_distances[facility] == min_distance # Select all nodes that are at the minimum distance from the analyzed node
-            ]
-            
-            # Apply tie-breaking rule (random assignment)            
-            chosen_facility = self.rng.choice(closest_facilities) if len(closest_facilities) > 1 else closest_facilities[0]
-            
-            facilities_nearest_nodes[chosen_facility].append(node)
-
-        return facilities_nearest_nodes
-
-
-    def calculate_potential_function(self):
-
-        """
-        Calculates the general utility of the system, which is the sum of all the utility the facilities gather.
-
-        Returns
-            system_general_utility (float): The sum of all the utility the facilities gather
-        """
-
-        system_general_utility = 0.0
-
-        for player_data in self.players.values():
-            system_general_utility += player_data['Utility']
-
-        return system_general_utility
-
-
-
-
-
-

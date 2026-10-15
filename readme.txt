@@ -1,1 +1,0 @@
-In this version I am focusing on improving only the convergence time of Nash Equilibrium using the 'smart' selection of the next agent in the BRD process

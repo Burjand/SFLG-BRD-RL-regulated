@@ -1,8 +1,6 @@
-copy
 numpy
-matplotlib.pyplot
-statistics
 networkx
-json5
-os
-sys
+matplotlib
+pandas
+scikit-learn
+pyjson5

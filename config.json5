@@ -1,37 +1,44 @@
 {
-    // Parameters
+    //HYPERPARAMETERS
     //Simulation
-    n_simulations: 2000,
-    max_iterations: 500,
+    save_results: false,
+    n_simulations: 500, // Episodes per run. Training budget in the article: 100 * n_players^2 (3600 for 6 players)
+    seed: 70,
+    regulated: true, // false: Random (filtered) baseline, ignores agent_type
+    fixed_graph: false, // true: one graph for every episode. false: fresh graph per episode (used in the article)
 
-    //Environmentters
-    n_nodes: 40,
-    n_potential_facilities: 32,
-    n_brd_players: 5,
-    max_iterations: 1000,
-    seed: 66,
-    convergence_threshold: 1e-5,
-    demand_distribution: ["normal",20,5],
-    weight_distribution: ["normal",5,1],
+    //Environment
+    network_topology: "erdos-renyi", //erdos-renyi or barabasi-albert or watts-strogatz
+    n_nodes: 25, // m in the article
+    min_similarity: 0.1, // sigma_min: similarity at the graph diameter
+    demand_distribution: ['uniform',1,1], // uniform demand
+    weight_distribution: ['uniform',1,1], // unit edge lengths
+    graph_density: 0.25, // Not used by the current generators (mean degree is fixed at 6)
 
-    //State observation
-    compact_states: true, // Generalization of states
-    num_boxes: 10, // How much generalization
-    distribution: "normal",
-    k_movement_memory: 3,
+    //BRD
+    rationality_epsilon: 0.00,
+    n_players: 6, // n in the article
+    max_iter: 500,
 
     //Regulatory agent
-    agent_architecture: "drunk", //Options so far: q_learning, drunk, montecarlo
-    learn_from_scratch: false,
-    alpha: 0.15,    // Importance of new experiences
-    gamma: 0.99,    // Importance of future rewards
-    epsilon: 0.9,   // Exploration
-    epsilon_decay_rate: 0.97,
+    agent_type: "RL", //RL or QL_Simple or Greedy or FI or Random or DecisionTree
+    learn_from_scratch: false, // true: train and save to data/agent_data/. false: load the stored Q-table (inference)
+    action_selection: "boltzmann", //boltzmann or epsilon-greedy
+    alpha: 0.10,    // Importance of new experiences
+    gamma: 0.2,    // Importance of future rewards
+    optimistic_value: 1,
+    n_steps_bootstrap: 6, // n-steps bootstrap
+    n_step_method: "standard", // "standard" (greedy bootstrap) or "tree_backup"
+    reward_function_name: "potential_function_difference",
+    plan: true, // Dyna planning
+    planning_time: 5, // Planning steps per real transition
+    //Action selection
+    //epsilon-greedy
+    epsilon: 1.0,   // Exploration
+    epsilon_decay_rate: 0.999, // Higher means more time doing random actions
     epsilon_min: 0.05,
-    optimistic_value: 10,
-    n: 2, // n-steps bootstrap
-    reward_function_name: "iterations",
-    plan: true,
-    planning_time: 5,
-    eligibility_lambda: 5
+    //Boltzmann
+    boltzmann_tau: 1.0, // Initial temperature (training)
+    boltzmann_tau_lr: 0.001,
+    target_entropy: 1.5,
 }

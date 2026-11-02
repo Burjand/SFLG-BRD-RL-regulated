@@ -12,20 +12,37 @@ class State():
 
         self.n_players = BRD.n_players
 
-        # Node quality: 1 if the node's closeness centrality is at or above the 60th percentile
-        closeness_centrality = nx.closeness_centrality(flg_graph.graph)
-        values = np.array(list(closeness_centrality.values()))
-        threshold = np.percentile(values, 60)
-        self.node_quality_map = {
-            node: 1 if cent >= threshold else 0
-            for node, cent in closeness_centrality.items()
-        }
-
-        # Closed 2-hop ball B_2(v) of every node, computed once per graph for the threat flag
-        self.k_ball = {
-            v: [u for u, d in dists.items() if d <= 2]
-            for v, dists in nx.all_pairs_shortest_path_length(flg_graph.graph)
-        }
+        # Computed once per graph:
+        #   node quality (topology flag z): 1 if the node's closeness centrality is at or
+        #     above the 60th percentile of the graph's nodes;
+        #   closed two-hop ball B_2(v) of every node (threat flag h), so that the per-step
+        #     observation costs O(n |B_2|).
+        # With unit edge lengths both are read off the game's distance matrix (flg_graph.py):
+        # on a connected graph, closeness(v) = (m - 1) / sum_u d(v, u), which is what
+        # networkx.closeness_centrality returns, and B_2(v) = {u : d(v, u) <= 2}. The flags
+        # are the same as with networkx shortest paths, at a fraction of the cost. With other
+        # edge lengths the game's distances are not hop counts, so networkx is used instead.
+        D = getattr(flg_graph, 'distance_matrix', None)
+        A = np.asarray(flg_graph.adj_matrix) # edge lengths; 0 where there is no edge
+        if D is not None and np.all(A[A != 0] == 1):
+            m = D.shape[0]
+            closeness = (m - 1) / D.sum(axis=1)
+            threshold = np.percentile(closeness, 60)
+            self.node_quality_map = {v: 1 if closeness[v] >= threshold else 0 for v in range(m)}
+            within_two_hops = D <= 2
+            self.k_ball = {v: np.flatnonzero(within_two_hops[v]).tolist() for v in range(m)}
+        else:
+            closeness_centrality = nx.closeness_centrality(flg_graph.graph)
+            values = np.array(list(closeness_centrality.values()))
+            threshold = np.percentile(values, 60)
+            self.node_quality_map = {
+                node: 1 if cent >= threshold else 0
+                for node, cent in closeness_centrality.items()
+            }
+            self.k_ball = {
+                v: [u for u, d in dists.items() if d <= 2]
+                for v, dists in nx.all_pairs_shortest_path_length(flg_graph.graph)
+            }
 
 
     def observe(self, players_find_best_response):

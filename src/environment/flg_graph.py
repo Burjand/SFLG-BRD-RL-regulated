@@ -24,6 +24,13 @@ class FLG_graph:
         self.distances = calculate_distance_matrix(self.graph) # Distances from all nodes to all nodes with Dijkstra
         self.D = calculate_D(self.graph, self.distances) # Graph diameter
 
+        # The same distances as a NumPy matrix (row u, column v), built once per graph and
+        # shared by the similarity table (users_behavior.py) and the regulator's observation
+        # (state_observation.py), which reads its closeness centralities and two-hop balls
+        # from it instead of recomputing shortest paths.
+        self.distance_matrix = np.array([[self.distances[u][v] for v in range(self.n_nodes)]
+                                         for u in range(self.n_nodes)])
+
 
     def _generate_base_topology(self, current_seed):
         # TARGET: Average Degree ~ 6 neighbors per node

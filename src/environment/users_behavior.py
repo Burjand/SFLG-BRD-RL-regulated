@@ -9,6 +9,7 @@ class Users_behavior():
 
         self.n_users = FLG_graph.n_nodes
         self.distances = FLG_graph.distances
+        self.distance_matrix = getattr(FLG_graph, 'distance_matrix', None)
         self.D = FLG_graph.D
         self.n_players = n_players
         self.min_similarity = global_config.get('min_similarity')
@@ -24,7 +25,10 @@ class Users_behavior():
         self.similarities_table = np.empty((self.n_users, self.n_users), dtype=np.float32)
 
         for user in range(self.n_users):
-            dist = np.array([self.distances[user][i] for i in range(self.n_users)])
+            if self.distance_matrix is not None: # Row of the matrix built once in flg_graph.py
+                dist = self.distance_matrix[user]
+            else:
+                dist = np.array([self.distances[user][i] for i in range(self.n_users)])
             self.similarities_table[user, :] = np.exp(-alpha * dist)
 
         assert np.allclose(self.similarities_table.diagonal(), 1, atol=1e-6) # Make sure every user considers a facility on its own node the best

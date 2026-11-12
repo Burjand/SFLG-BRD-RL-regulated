@@ -13,6 +13,7 @@ from src.regulatory_agent.convergence_time.greedy_agent_time import Greedy_agent
 from src.regulatory_agent.convergence_time.first_improvement_agent import First_improvement_agent
 from src.regulatory_agent.convergence_time.decision_tree_agent import Decision_tree_agent
 from src.regulatory_agent.convergence_time.pure_random_agent import PureRandom_agent
+from src.regulatory_agent.convergence_time.flag_respecting_agents import Round_robin_agent, Lowest_payoff_agent, Masked_argmax_agent, Top_of_order_agent
 
 class Simulation():
 
@@ -119,6 +120,16 @@ class Simulation():
                 self.regulatory_agent = PureRandom_agent()
             elif self.agent_type=="DecisionTree":
                 self.regulatory_agent = Decision_tree_agent()
+            elif self.agent_type=="RoundRobin":
+                self.regulatory_agent = Round_robin_agent(self.n_players)
+            elif self.agent_type=="LowestPayoff":
+                self.regulatory_agent = Lowest_payoff_agent(self.BRD)
+            elif self.agent_type=="MaskedArgmax":
+                # Reads the stored Q-table of the learned regulator
+                q_agent = Q_learning_agent(max_possible_actions=self.n_players, optimistic_value=self.optimistic_value, learn_from_scratch=False)
+                self.regulatory_agent = Masked_argmax_agent(self.n_players, q_agent.q_table)
+            elif self.agent_type=="TopOfOrder":
+                self.regulatory_agent = Top_of_order_agent(self.n_players)
             else:
                 raise KeyError("Unrecognized agent type")
         else:
@@ -154,6 +165,12 @@ class Simulation():
                 self.regulatory_agent = First_improvement_agent(self.n_players, self.BRD)
         # With fixed_graph the players are still re-placed every episode by BRD.create_players() in run_simulations()
 
+        # Round-robin restarts at player 0, and lowest payoff first reads the current BRD, in every episode
+        if self.regulated and self.agent_type == "RoundRobin":
+            self.regulatory_agent = Round_robin_agent(self.n_players)
+        elif self.regulated and self.agent_type == "LowestPayoff":
+            self.regulatory_agent = Lowest_payoff_agent(self.BRD)
+
         # Local bindings
         RA = self.regulatory_agent
         state = self.state
@@ -183,9 +200,9 @@ class Simulation():
 
             t += 1
 
-            # Regulated agents (except FI) choose among all players. FI and Random (filtered) only among
-            # players flagged as 'needing a check', to avoid the coupon collector's problem in random selection
-            if self.regulated and self.agent_type != "FI":
+            # Regulated agents choose among all players, except FI, round-robin and lowest payoff first, which,
+            # like Random (filtered), choose only among players flagged as 'needing a check'
+            if self.regulated and self.agent_type not in ("FI", "RoundRobin", "LowestPayoff"):
                 current_valid_actions = [i for i in range(self.n_players)]
             else:
                 current_valid_actions = [i for i, x in enumerate(players_find_best_response) if x]
@@ -199,11 +216,11 @@ class Simulation():
             prev_observed_state = St_tuple
 
             # Regulatory agent chooses action
-            # RL, QL_Simple and DecisionTree return a rank in the canonical order; the others return a player ID
+            # RL, QL_Simple, DecisionTree, MaskedArgmax and TopOfOrder return a rank in the canonical order; the others return a player ID
             canonical_action = RA.choose_action(St_tuple, tuple(current_valid_actions), state_unchanged_count=state_unchanged_count)
             action = canonical_action  # learn() stores the rank-space action
 
-            if self.regulated and self.agent_type in ("RL", "DecisionTree", "QL_Simple"):
+            if self.regulated and self.agent_type in ("RL", "DecisionTree", "QL_Simple", "MaskedArgmax", "TopOfOrder"):
                 player_in_turn = state.canonical_to_player(canonical_action)
             else:
                 player_in_turn = canonical_action

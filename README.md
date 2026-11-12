@@ -1,6 +1,6 @@
 # Learned regulators for best-response dynamics
 
-Code for the paper *Explainable Reinforcement Learning Regulators for Best-Response Dynamics in Potential Games*, by Andrés B. Torres-Reyes and Rolando Menchaca-Méndez (submitted to *Mathematics*, MDPI, 2026).
+Code for the paper *Explainable Reinforcement Learning Regulators for Best-Response Dynamics in Shapley Facility Location Games*, by Andrés B. Torres-Reyes and Rolando Menchaca-Méndez (*Mathematics*, MDPI, 2026; accepted).
 
 The Shapley facility location game (SFLG) was introduced by [Ben-Porat and Tennenholtz (2017)](https://arxiv.org/abs/1709.10278). In it, players place facilities, and users split their demand among the facilities by a Shapley-value allocation. We use a discrete version of the game on a graph, where players take turns playing best responses until they reach a pure Nash equilibrium. The order in which they are activated decides how long that takes. A regulator chooses who moves next, seeing only four binary flags per player. In the paper we learn that regulator with tabular reinforcement learning and compare it with the usual activation rules. The comparison is by total computational cost, not only by the number of activations.
 
@@ -8,7 +8,8 @@ This repository contains:
 
 - the game;
 - the asynchronous best-response dynamics;
-- the activation rules from the paper: greedy, first-improvement, random and random (filtered);
+- the activation rules from the paper: greedy, first-improvement, round-robin, lowest payoff first, random and random (filtered);
+- masked argmax and the top of the canonical order, the two deterministic rules of Section 5.3;
 - the learned regulator (n-step Q-learning with Dyna planning and Boltzmann selection);
 - the plain Q-learning baseline;
 - the distillation of the learned policy into decision trees.
@@ -39,6 +40,7 @@ src/
       first_improvement_agent.py first-improvement
       pure_random_agent.py       random
       decision_tree_agent.py     a distilled decision tree used as the regulator
+      flag_respecting_agents.py  round-robin, lowest payoff first, masked argmax, top of the order
   tools/
     policy_extraction.py       relational dataset, CART trees, cross-validation, fidelity ceiling
     results_manager.py         saves the runs of main.py
@@ -87,6 +89,10 @@ To try another activation rule, change `agent_type` in `config.json5`:
 | `FI` | first-improvement | players with b = 1 |
 | `Random` | random | all players |
 | `DecisionTree` | depth-5 tree distilled from the stored table when the run starts | all n ranks |
+| `RoundRobin` | round-robin | players with b = 1 |
+| `LowestPayoff` | lowest payoff first | players with b = 1 |
+| `MaskedArgmax` | masked argmax, on the stored table | ranks with b = 1 |
+| `TopOfOrder` | top of the canonical order | rank n |
 | any, with `regulated: false` | random (filtered) | players with b = 1 |
 
 With `n_simulations: 1`, `main.py` runs a single episode and plots the potential, the positions and the utilities over time.
@@ -170,7 +176,7 @@ These are in the code but not spelled out in the paper:
 
 - Erdős–Rényi graphs, m = 25, n = 6;
 - 3600 training episodes;
-- α = 0.10, γ = 0.2, H* = 1.5, n_TD = 1, n_plan = 2 (Table 4).
+- α = 0.10, γ = 0.2, H* = 1.5, n_TD = 1, n_plan = 2 (Table 5).
 
 It has 315 visited observations. The seed-209 trees shown in Section 6 (depths 3 and 5) were distilled from it.
 
@@ -178,7 +184,7 @@ It has 315 visited observations. The seed-209 trees shown in Section 6 (depths 3
 python -m src.tools.policy_extraction
 ```
 
-This command distills it again (depth 5) and prints the fidelity ceilings of Table 10: 83.60% accuracy, 74.98% balanced accuracy and 50.12% F1.
+This command distills it again (depth 5) and prints the fidelity ceilings of Table 11: 83.60% accuracy, 74.98% balanced accuracy and 50.12% F1.
 
 ## Citation
 
@@ -186,7 +192,7 @@ If you use this code, please cite the paper:
 
 ```
 A. B. Torres-Reyes and R. Menchaca-Méndez, "Explainable Reinforcement Learning Regulators
-for Best-Response Dynamics in Potential Games," submitted to Mathematics (MDPI), 2026.
+for Best-Response Dynamics in Shapley Facility Location Games," Mathematics (MDPI), 2026.
 ```
 
 The SFLG model comes from:

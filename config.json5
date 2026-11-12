@@ -21,7 +21,7 @@
     max_iter: 500,
 
     //Regulatory agent
-    agent_type: "RL", //RL or QL_Simple or Greedy or FI or Random or DecisionTree
+    agent_type: "RL", //RL or QL_Simple or Greedy or FI or Random or DecisionTree or RoundRobin or LowestPayoff or MaskedArgmax or TopOfOrder
     learn_from_scratch: false, // true: train and save to data/agent_data/. false: load the stored Q-table (inference)
     action_selection: "boltzmann", //boltzmann or epsilon-greedy
     alpha: 0.10,    // Importance of new experiences

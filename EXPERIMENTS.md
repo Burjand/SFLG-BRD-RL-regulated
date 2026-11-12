@@ -36,13 +36,13 @@ The helper functions below do exactly that. Every code block in this file was ru
 - **Training budget.** 100·n² episodes (150·n² in the feature study).
 - **Uncertainty.** 95% bootstrap intervals over episodes.
 
-The configuration grid (Table 3): m ∈ {15, 25, 35}, n = ⌊m·d⌋ with d ∈ {1/5, 1/4, 1/3, 1/2}, which gives 11 distinct cells:
+The configuration grid (Table 4): m ∈ {15, 25, 35}, n = ⌊m·d⌋ with d ∈ {1/5, 1/4, 1/3, 1/2}, which gives 11 distinct cells:
 
 ```
 (15,3) (15,5) (15,7) (25,5) (25,6) (25,8) (25,12) (35,7) (35,8) (35,11) (35,17)
 ```
 
-## Configuration per experiment (Table 4)
+## Configuration per experiment (Table 5)
 
 | Experiment | Section | Seed pairs | Training episodes | α | H* | n_TD | Target | n_plan |
 |---|---|---|---|---|---|---|---|---|
@@ -61,7 +61,7 @@ Settings shared by every experiment:
 - τ_base = 0.01, τ_boost = 1.5, K = 3;
 - ε from 1.0 to 0.05 with decay 0.999 per episode (only for the ε-greedy variants).
 
-`config.json5` holds the scalability row (Table 5).
+`config.json5` holds the scalability row (Table 6).
 
 ## Helper functions
 
@@ -74,7 +74,7 @@ from collections import defaultdict
 
 from simulation import Simulation
 
-# Table 5: the regulator of the scalability experiment, on (m, n) = (25, 6)
+# Table 6: the regulator of the scalability experiment, on (m, n) = (25, 6)
 HP = {
     "seed": 209, "regulated": True, "fixed_graph": False,
     "network_topology": "erdos-renyi", "n_nodes": 25, "n_players": 6,
@@ -120,7 +120,9 @@ def make_baseline(hp, rule, test_seed):
     if rule == "Random (filtered)":
         hp["regulated"] = False
     else:
-        hp["agent_type"] = {"Greedy": "Greedy", "First-improvement": "FI", "Random": "Random"}[rule]
+        hp["agent_type"] = {"Greedy": "Greedy", "First-improvement": "FI", "Round-robin": "RoundRobin",
+                            "Lowest payoff first": "LowestPayoff", "Top of the order": "TopOfOrder",
+                            "Random": "Random"}[rule]
     return Simulation(hp)
 
 
@@ -135,73 +137,97 @@ def evaluate(sim, n_episodes=500):
     return out
 ```
 
-Example: one training seed and one test seed of the regulator, against the four baselines.
+Example: one training seed and one test seed of the regulator and of masked argmax, against the other rules.
 
 ```python
 q = train(HP, 209, "data/agent_data/my_run/seed_209")
-res = {"Regulator": evaluate(make_regulator(HP, q, 307))}
-for rule in ("Greedy", "First-improvement", "Random (filtered)", "Random"):
+res = {"Regulator": evaluate(make_regulator(HP, q, 307)),
+       "Masked argmax": evaluate(make_regulator(dict(HP, agent_type="MaskedArgmax"), q, 307))}
+for rule in ("Greedy", "First-improvement", "Round-robin", "Lowest payoff first", "Top of the order",
+             "Random (filtered)", "Random"):
     res[rule] = evaluate(make_baseline(HP, rule, 307))
 
 for rule, r in res.items():
     T = np.array(r["iters_to_NE"])
     failed = np.array(r["sim_iters"]) >= HP["max_iter"]
-    print(f"{rule:18s} E[T] = {T.mean():.2f}   non-convergence = {failed.mean():.2%}")
+    print(f"{rule:20s} E[T] = {T.mean():.2f}   non-convergence = {failed.mean():.2%}")
 ```
 
 Build every `Simulation` right before its episodes run. The constructor reseeds NumPy and `random`, so the order matters if you want runs to repeat exactly.
 
-Regulator variants (`QL_Simple`, ε-greedy and so on) go through `make_regulator` too. Change `agent_type` or `action_selection` in `hp` for both training and testing.
+Regulator variants (`QL_Simple`, ε-greedy and so on) go through `make_regulator` too. Change `agent_type` or `action_selection` in `hp` for both training and testing. Masked argmax reads a table trained as the regulator, so only the test `hp` changes (`agent_type="MaskedArgmax"`).
 
 ## Scalability and total computational cost (Section 5.2)
 
-**Settings.** Use `HP` as it is, on the 11 cells of Table 3, with 3 training seeds × 7 test seeds. The rules are the regulator, greedy, first-improvement, random (filtered) and random.
+**Settings.** Use `HP` as it is, on the 11 cells of Table 4.
 
-**Timing.** Measure only the decision phase:
+- The regulator: 3 training seeds × 7 test seeds.
+- Masked argmax: the same trained tables on the same instances as the regulator, so the two can be compared episode by episode.
+- Greedy, first-improvement, round-robin, lowest payoff first, top of the order, random (filtered) and random: 7 test seeds each (`make_baseline`), all on the same instances.
 
-- for the regulator, `state.observe()` + `choose_action()`;
-- for every other rule, `choose_action()` alone.
+**Timing.** Measure the decision and the best-response update separately:
 
-The paper used 100 episodes per (rule, cell), single-threaded, on one graph per cell. Players are re-placed every episode.
+- for the rules that act on the observation (the regulator, masked argmax and top of the order), the decision is `state.observe()` + `choose_action()`;
+- for every other rule, `choose_action()` alone;
+- the update is `compute_player_best_response()`, recorded together with whether the player relocated.
+
+The paper used 100 episodes per (rule, cell), single-threaded, on one graph per cell (`fixed_graph: True`). Players are re-placed every episode.
 
 ```python
-def timed_episode(sim, is_regulator):
+RANK_RULES = ("RL", "QL_Simple", "DecisionTree", "MaskedArgmax", "TopOfOrder")
+FLAGGED_RULES = ("FI", "RoundRobin", "LowestPayoff")
+
+
+def timed_episode(sim):
     state, agent = sim.state, sim.regulatory_agent
+    rank_space = sim.regulated and sim.agent_type in RANK_RULES
+    flagged_only = not sim.regulated or sim.agent_type in FLAGGED_RULES
+    if hasattr(agent, "next_player"):
+        agent.next_player = 0                      # round-robin starts every episode at player 0
     b = np.ones(sim.n_players, dtype=np.bool_)
     St = state.observe(b)
-    prev, repeats, step_us = None, 0, []
+    prev, repeats = None, 0
+    dec_us, upd_us, moved = [], [], []
     for _ in range(sim.max_iter):
-        if sim.regulated and sim.agent_type != "FI":
-            valid = tuple(range(sim.n_players))
-        else:
-            valid = tuple(i for i, x in enumerate(b) if x)
+        valid = tuple(i for i, x in enumerate(b) if x) if flagged_only else tuple(range(sim.n_players))
         repeats = repeats + 1 if tuple(St) == prev else 0
         prev = tuple(St)
 
         t0 = time.perf_counter()
-        if is_regulator:
+        if rank_space:
             St = state.observe(b)
         action = agent.choose_action(tuple(St), valid, state_unchanged_count=repeats)
-        step_us.append((time.perf_counter() - t0) * 1e6)
+        dec_us.append((time.perf_counter() - t0) * 1e6)
 
-        player = state.canonical_to_player(action) if is_regulator else action
-        if sim.BRD.compute_player_best_response(player):
+        player = state.canonical_to_player(action) if rank_space else action
+        t0 = time.perf_counter()
+        relocated = sim.BRD.compute_player_best_response(player)
+        upd_us.append((time.perf_counter() - t0) * 1e6)
+        moved.append(bool(relocated))
+        if relocated:
             b[:] = True
         b[player] = False
         if not b.any():
             break
         St = state.observe(b)
-    return np.array(step_us)
+    return np.array(dec_us), np.array(upd_us), np.array(moved)
 ```
 
 Before importing NumPy, set `OMP_NUM_THREADS`, `MKL_NUM_THREADS` and `OPENBLAS_NUM_THREADS` to 1, so that every rule is timed on a single thread.
 
 **Total cost.**
 
-- Every rule also pays the best-response update of the activated player. The code runs that update for every rule, greedy included.
-- The update costs one candidate evaluation: u = d_Greedy / n, the greedy decision time divided by n.
-- The per-step cost is c(π) = d_π + u, and the total cost is C(π) = E[T] · c(π).
+- Every rule pays the best-response update of the activated player. The code runs that update for every rule, greedy included.
+- One candidate evaluation is u = d_Greedy / n, the greedy decision time divided by n.
+- The update enters as two coefficients, in candidate evaluations, taken from the update times of every rule in the run: k₀ = (mean update without relocation) / u, and k₁ = (mean update with relocation) / u − k₀.
+- The total cost per instance is C(π) = E[T] · (d_π + k₀·u) + k₁·u·E[R], where R = `sim_iters − plateau_counts` is the number of relocations, all of which happen by T.
+- If greedy selection and first-improvement handed the activated player the best response they had already computed, they would skip the evaluation: C(π) = E[T] · d_π + k₁·u·E[R]. This is the variant reported at the end of the cost comparison.
+- Every timing run includes greedy selection and the regulator. Rules timed in different runs are put on a common scale through the decision time of one of the two measured in the same run: the regulator's for masked argmax and top of the order, greedy selection's for the others.
 - The paper's timings come from an Intel Core i7-13700HX. Absolute times differ between machines; the ratios are the comparable part.
+
+**Preprocessing.** The regulator's observation needs each network's closeness centralities and two-hop balls, which `State(flg_graph, BRD)` computes from the distance matrix. To measure them, build 100 fresh graphs per cell, exactly as an episode builds them, and time `State(...)` against greedy selection's decision time on the same graph and initial profile, divided by n. The ratio is the preprocessing cost in candidate evaluations. Table 7 is on a preprocessed network; when every instance comes on a new network, add this cost once per instance to the rules that read the observation.
+
+**Training cost and break-even.** Time each training run. Dividing that time by the saving per solved instance, C(π_G) − C(π_RL), gives the number of instances after which training is recovered (lower block of Table 7). Counting only the activations performed in training, each at the regulator's cost per step, gives the lower bound reported in Section 5.2.
 
 ## Reliability under state aliasing and learning mechanisms (Sections 5.3 and 5.5)
 
@@ -234,6 +260,14 @@ def argmax_choose_action(self, state, valid_actions, state_unchanged_count=0):
 sim = make_regulator(HP, q, 307)
 sim.regulatory_agent.choose_action = types.MethodType(argmax_choose_action, sim.regulatory_agent)
 ```
+
+**Deterministic rules that respect the flags.** Masked argmax and top of the order are the runs of Section 5.2 (`agent_type` `"MaskedArgmax"` and `"TopOfOrder"`). Neither can stall (Lemma 3), and neither can round-robin or lowest payoff first.
+
+**Where the loops come from.** For each table trained in the scalability experiment, take the observations visited in training that hold both checked (b = 0) and unchecked (b = 1) players, and report:
+
+- how often argmax_a Q(o, a) falls strictly on a checked player;
+- how many of those winning entries still hold the optimistic initial value Q₀ = 1;
+- for the checked-player entries that training did update, their value relative to the best unchecked action. At the fixed point, an activation that leaves the observation unchanged is worth γ times that value.
 
 ## Feature ablation (Section 5.4)
 
@@ -305,7 +339,7 @@ from src.regulatory_agent.convergence_time.decision_tree_agent import Decision_t
 q_path = "data/agent_data/Q_Learning/q_values.pkl.gz"
 distiller = Extracted_policy(q_table_file_path=q_path)
 distiller.prepare_dataset()                  # one row per (observation, rank); label: rank is the argmax
-distiller.bayes_optimal_diagnostic()         # fidelity ceilings (Table 10)
+distiller.bayes_optimal_diagnostic()         # fidelity ceilings (Table 11)
 distiller.cross_validate(k=10, max_depth=3, min_samples_leaf=50)
 distiller.train(max_depth=3, min_samples_leaf=50)
 
@@ -323,7 +357,7 @@ The paper's trees use depths 3 and 5, with `min_samples_leaf=50`. On the stored 
 - balanced accuracy 69.94 ± 4.85%;
 - F1 43.76 ± 5.48%.
 
-**Exhaustive check (Table 11).** No tree selects a player with b = 0. To check it, apply the tree to every canonical observation:
+**Exhaustive check (Table 12).** No tree selects a player with b = 0. To check it, apply the tree to every canonical observation:
 
 ```python
 from itertools import combinations_with_replacement
@@ -348,6 +382,15 @@ for obs, b in all_observations(n):
         picks_b0 += (b[rank] == 0)
 print(total, with_b, picks_b0)   # 54264 52548 0, for both depths
 ```
+
+## Why lowest payoff first works (Section 7.3)
+
+Two analyses of the scalability experiment. Neither needs training.
+
+- **Payoff and gain.** Run lowest payoff first for 30 episodes per test seed (210 per cell). At every decision with more than one unchecked player, compute the best-response gain of every unchecked player, for the analysis only (one candidate evaluation each; the rule itself never does this), and record:
+  - the Spearman correlation between current payoff and available gain;
+  - among the decisions where some unchecked player can still improve: whether the pick relocates, the share of unchecked players that would relocate (what a uniform pick among them achieves), and whether the pick is one of greedy selection's choices.
+- **The learned preference.** For each table trained in the scalability experiment, take the observations visited in training that hold unchecked players both below the median payoff (w = 1) and above it (w = 0). Compare the best value in the first group with the best in the second, and report the share of observations where the table prefers a below-median player, leaving out exact ties (mostly entries still at Q₀). Without a learned preference, the share would be about 50%.
 
 ## Cost of a full re-run
 
